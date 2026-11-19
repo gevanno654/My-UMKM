@@ -1,0 +1,155 @@
+import 'package:drift/native.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:pos_app/core/db/app_db.dart';
+import 'package:pos_app/core/router.dart';
+import 'package:pos_app/core/session/secure_session.dart';
+
+/// In-memory fake dari [SecureStorage] agar test tidak menyentuh
+/// platform channel (flutter_secure_storage).
+class MemorySecureStorage implements SecureStorage {
+  final Map<String, String> _data = {};
+
+  @override
+  Future<String?> read(String key) async => _data[key];
+
+  @override
+  Future<void> write(String key, String? value) async {
+    if (value == null) {
+      _data.remove(key);
+    } else {
+      _data[key] = value;
+    }
+  }
+
+  @override
+  Future<void> delete(String key) async {
+    _data.remove(key);
+  }
+
+  @override
+  Future<void> deleteAll() async {
+    _data.clear();
+  }
+}
+
+void main() {
+  group('AppDb', () {
+    late AppDb db;
+
+    setUp(() {
+      db = AppDb(NativeDatabase.memory());
+    });
+
+    tearDown(() async {
+      await db.close();
+    });
+
+    test('insert + read store', () async {
+      await db.upsertStore(
+        LocalStoresCompanion.insert(
+          serverId: 'store-1',
+          name: 'Warung Barokah',
+        ),
+      );
+
+      final store = await db.getStore('store-1');
+
+      expect(store, isNotNull);
+      expect(store!.serverId, 'store-1');
+      expect(store.name, 'Warung Barokah');
+    });
+
+    test('insert + read user', () async {
+      await db.upsertUser(
+        LocalUsersCompanion.insert(
+          serverId: 'user-1',
+          storeId: 'store-1',
+          name: 'Budi',
+          email: 'budi@warung.id',
+        ),
+      );
+
+      final user = await db.getUser('user-1');
+
+      expect(user, isNotNull);
+      expect(user!.serverId, 'user-1');
+      expect(user.storeId, 'store-1');
+      expect(user.name, 'Budi');
+      expect(user.email, 'budi@warung.id');
+    });
+  });
+
+  group('SecureSession', () {
+    test('save/read tokens round-trip', () async {
+      final session = SecureSession(storage: MemorySecureStorage());
+
+      await session.saveTokens(
+        accessToken: 'access-123',
+        refreshToken: 'refresh-456',
+        profileJson: '{"name":"Budi"}',
+      );
+      final tokens = await session.readTokens();
+
+      expect(tokens.accessToken, 'access-123');
+      expect(tokens.refreshToken, 'refresh-456');
+      expect(tokens.profileJson, '{"name":"Budi"}');
+    });
+
+    test('savePinHash menyimpan hash, bukan plaintext', () async {
+      final session = SecureSession(storage: MemorySecureStorage());
+
+      await session.savePinHash(pin: '123456');
+      final tokens = await session.readTokens();
+
+      expect(tokens.pinHash, isNotNull);
+      expect(tokens.pinHash, isNot('123456'));
+      expect(tokens.pinHash, isNotEmpty);
+    });
+
+    test('clear menghapus semua sesi', () async {
+      final session = SecureSession(storage: MemorySecureStorage());
+
+      await session.saveTokens(
+        accessToken: 'access-123',
+        refreshToken: 'refresh-456',
+      );
+      await session.savePinHash(pin: '123456');
+      await session.clear();
+      final tokens = await session.readTokens();
+
+      expect(tokens.accessToken, isNull);
+      expect(tokens.refreshToken, isNull);
+      expect(tokens.pinHash, isNull);
+      expect(tokens.profileJson, isNull);
+    });
+  });
+
+  group('router', () {
+    const expectedPaths = [
+      '/splash',
+      '/login',
+      '/register',
+      '/pin-setup',
+      '/pin-unlock',
+      '/home',
+    ];
+
+    test('memetakan 6 route', () {
+      expect(appRoutePaths, unorderedEquals(expectedPaths));
+    });
+
+    for (final path in expectedPaths) {
+      testWidgets('route $path membangun screen', (tester) async {
+        await tester.pumpWidget(
+          MaterialApp.router(
+            routerConfig: buildRouter(initialLocation: path),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.text(path), findsOneWidget);
+      });
+    }
+  });
+}
