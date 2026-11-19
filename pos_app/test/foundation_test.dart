@@ -1,5 +1,6 @@
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pos_app/core/db/app_db.dart';
 import 'package:pos_app/core/router.dart';
@@ -139,8 +140,9 @@ void main() {
       expect(appRoutePaths, unorderedEquals(expectedPaths));
     });
 
-    for (final path in expectedPaths) {
-      testWidgets('route $path membangun screen', (tester) async {
+    // PIN masih placeholder (Task 5); splash/login/register/home sudah screen asli.
+    for (final path in ['/pin-setup', '/pin-unlock']) {
+      testWidgets('route $path membangun placeholder', (tester) async {
         await tester.pumpWidget(
           MaterialApp.router(
             routerConfig: buildRouter(initialLocation: path),
@@ -151,5 +153,49 @@ void main() {
         expect(find.text(path), findsOneWidget);
       });
     }
+
+    testWidgets('route /splash menampilkan loading', (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp.router(
+            routerConfig: buildRouter(initialLocation: '/splash'),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      // Splash langsung menampilkan indikator; redirect terjadi setelah frame.
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    });
+
+    for (final entry in {'/login': 'Masuk', '/register': 'Daftar'}.entries) {
+      testWidgets('route ${entry.key} membangun screen ${entry.value}', (
+        tester,
+      ) async {
+        await tester.pumpWidget(
+          ProviderScope(
+            child: MaterialApp.router(
+              routerConfig: buildRouter(initialLocation: entry.key),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.text(entry.value), findsWidgets);
+      });
+    }
+
+    testWidgets('route /home membangun HomePlaceholder', (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp.router(
+            routerConfig: buildRouter(initialLocation: '/home'),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Kasir segera hadir'), findsOneWidget);
+    });
   });
 }

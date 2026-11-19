@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-/// Semua route fondasi. Screen asli (Task 4-5) akan menggantikan
-/// [PlaceholderScreen] satu per satu tanpa mengubah path.
+import '../features/auth/home_placeholder.dart';
+import '../features/auth/login_screen.dart';
+import '../features/auth/register_screen.dart';
+import '../features/auth/splash_screen.dart';
+
+/// Semua route fondasi. Screen PIN (Task 5) masih placeholder.
 const appRoutePaths = <String>[
   '/splash',
   '/login',
@@ -16,11 +20,32 @@ GoRouter buildRouter({String initialLocation = '/splash'}) {
   return GoRouter(
     initialLocation: initialLocation,
     routes: [
-      for (final path in appRoutePaths)
-        GoRoute(
-          path: path,
-          builder: (context, state) => PlaceholderScreen(path: path),
-        ),
+      GoRoute(
+        path: '/splash',
+        builder: (context, state) => const SplashScreen(),
+      ),
+      GoRoute(
+        path: '/login',
+        builder: (context, state) => const LoginScreen(),
+      ),
+      GoRoute(
+        path: '/register',
+        builder: (context, state) => const RegisterScreen(),
+      ),
+      GoRoute(
+        path: '/pin-setup',
+        builder: (context, state) =>
+            const PlaceholderScreen(path: '/pin-setup'),
+      ),
+      GoRoute(
+        path: '/pin-unlock',
+        builder: (context, state) =>
+            const PlaceholderScreen(path: '/pin-unlock'),
+      ),
+      GoRoute(
+        path: '/home',
+        builder: (context, state) => const HomePlaceholder(),
+      ),
     ],
   );
 }
