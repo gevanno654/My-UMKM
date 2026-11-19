@@ -8,6 +8,7 @@ import '../../core/db/app_db.dart';
 import '../../core/session/secure_session.dart';
 import 'auth_api.dart';
 import 'auth_state.dart';
+import 'pin_guard.dart';
 
 final secureSessionProvider = Provider<SecureSession>((ref) {
   return SecureSession();
@@ -51,9 +52,11 @@ class AuthNotifier extends Notifier<AuthState> {
     final profile = AuthProfile.fromJson(
       jsonDecode(tokens.profileJson!) as Map<String, dynamic>,
     );
+    // Sesi ber-PIN selalu dimulai terkunci: wajib unlock offline via PIN.
+    // Token access yang kadaluarsa tidak masalah — app tetap buka via PIN.
     state = tokens.pinHash == null
         ? AuthPinSetupRequired(profile)
-        : AuthAuthenticated(profile);
+        : AuthPinLocked(profile);
   }
 
   Future<void> register({
@@ -114,6 +117,47 @@ class AuthNotifier extends Notifier<AuthState> {
     await _session.clear();
     state = const AuthUnauthenticated();
   }
+
+  /// Menyimpan PIN 6-digit baru (2x konfirmasi sudah divalidasi screen)
+  /// lalu membuka sesi penuh. Dipanggil dari state [AuthPinSetupRequired].
+  ///
+  /// Mengembalikan pesan error validasi, atau null bila berhasil.
+  Future<String?> completePinSetup({
+    required String pin,
+    required String confirmPin,
+  }) async {
+    if (!_isSixDigit(pin)) return 'PIN harus 6 digit angka';
+    if (pin != confirmPin) return 'Konfirmasi PIN tidak sama';
+    await _session.savePinHash(pin: pin);
+    await _session.resetPinFailCount();
+    await _session.clearPinLockedUntil();
+    final tokens = await _session.readTokens();
+    final profile = AuthProfile.fromJson(
+      jsonDecode(tokens.profileJson!) as Map<String, dynamic>,
+    );
+    state = AuthAuthenticated(profile);
+    return null;
+  }
+
+  /// Membuka sesi terkunci dengan PIN — murni offline (tanpa jaringan).
+  ///
+  /// Mengembalikan true bila PIN benar (state → [AuthAuthenticated]).
+  /// PIN salah / terkunci → state tetap [AuthPinLocked].
+  Future<bool> unlockSession(String pin) async {
+    final guard = PinGuard(session: _session);
+    final ok = await guard.verifyPin(pin);
+    if (ok) {
+      final tokens = await _session.readTokens();
+      final profile = AuthProfile.fromJson(
+        jsonDecode(tokens.profileJson!) as Map<String, dynamic>,
+      );
+      state = AuthAuthenticated(profile);
+    }
+    return ok;
+  }
+
+  static bool _isSixDigit(String pin) =>
+      pin.length == 6 && int.tryParse(pin) != null;
 
   Future<void> _persistSuccess(AuthResult result) async {
     await _session.saveTokens(

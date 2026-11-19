@@ -26,6 +26,9 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
     final state = ref.read(authProvider);
     if (state is AuthAuthenticated) {
       context.go('/home');
+    } else if (state is AuthPinLocked) {
+      // Sesi tersimpan + PIN sudah ada: wajib buka via PIN (offline OK).
+      context.go('/pin-unlock');
     } else if (state is AuthPinSetupRequired) {
       context.go('/pin-setup');
     } else {

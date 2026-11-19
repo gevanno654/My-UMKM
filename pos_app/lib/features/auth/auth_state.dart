@@ -99,6 +99,14 @@ class AuthPinSetupRequired extends AuthState {
   final AuthProfile profile;
 }
 
+/// Sesi tersimpan lengkap (token + profil + PIN) tapi belum dibuka
+/// dengan PIN pada peluncuran ini. Wajib unlock offline sebelum `/home`.
+class AuthPinLocked extends AuthState {
+  const AuthPinLocked(this.profile);
+
+  final AuthProfile profile;
+}
+
 /// Sesi penuh: token ada + PIN lokal sudah diset.
 class AuthAuthenticated extends AuthState {
   const AuthAuthenticated(this.profile);

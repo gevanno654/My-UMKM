@@ -140,17 +140,22 @@ void main() {
       expect(appRoutePaths, unorderedEquals(expectedPaths));
     });
 
-    // PIN masih placeholder (Task 5); splash/login/register/home sudah screen asli.
-    for (final path in ['/pin-setup', '/pin-unlock']) {
-      testWidgets('route $path membangun placeholder', (tester) async {
+    // PIN sudah screen asli (Task 5): butuh ProviderScope karena ConsumerWidget.
+    for (final entry in {
+      '/pin-setup': 'Buat PIN',
+      '/pin-unlock': 'Buka dengan PIN',
+    }.entries) {
+      testWidgets('route ${entry.key} membangun screen PIN', (tester) async {
         await tester.pumpWidget(
-          MaterialApp.router(
-            routerConfig: buildRouter(initialLocation: path),
+          ProviderScope(
+            child: MaterialApp.router(
+              routerConfig: buildRouter(initialLocation: entry.key),
+            ),
           ),
         );
         await tester.pumpAndSettle();
 
-        expect(find.text(path), findsOneWidget);
+        expect(find.text(entry.value), findsWidgets);
       });
     }
 

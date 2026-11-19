@@ -52,6 +52,8 @@ class SecureSession {
   static const keyPinHash = 'pin_hash';
   static const keyPinSalt = 'pin_salt';
   static const keyProfileJson = 'profile_json';
+  static const keyPinFailCount = 'pin_fail_count';
+  static const keyPinLockedUntil = 'pin_locked_until';
 
   final SecureStorage _storage;
 
@@ -99,6 +101,32 @@ class SecureSession {
   }
 
   Future<void> clear() => _storage.deleteAll();
+
+  /// Jumlah percobaan PIN salah beruntun (untuk lockout brute-force).
+  Future<int> readPinFailCount() async {
+    final raw = await _storage.read(keyPinFailCount);
+    return int.tryParse(raw ?? '') ?? 0;
+  }
+
+  Future<void> writePinFailCount(int count) =>
+      _storage.write(keyPinFailCount, count.toString());
+
+  Future<void> resetPinFailCount() => _storage.delete(keyPinFailCount);
+
+  /// Batas waktu kunci (epoch millis UTC); null bila tidak terkunci.
+  Future<DateTime?> readPinLockedUntil() async {
+    final raw = await _storage.read(keyPinLockedUntil);
+    final millis = int.tryParse(raw ?? '');
+    if (millis == null) return null;
+    return DateTime.fromMillisecondsSinceEpoch(millis, isUtc: true);
+  }
+
+  Future<void> writePinLockedUntil(DateTime until) => _storage.write(
+        keyPinLockedUntil,
+        until.toUtc().millisecondsSinceEpoch.toString(),
+      );
+
+  Future<void> clearPinLockedUntil() => _storage.delete(keyPinLockedUntil);
 
   static String _newSalt() {
     final random = Random.secure();
