@@ -4,9 +4,9 @@
 
 **Goal:** Membangun fondasi monorepo (Flutter app + backend REST + Postgres) dan fitur autentikasi dua lapis (online JWT + offline PIN) yang siap diuji.
 
-**Architecture:** Flutter offline-first (Drift/SQLite lokal, token di secure storage) ↔ HTTPS REST (Express) ↔ PostgreSQL dengan isolasi `store_id`. Auth online sekali, lalu PIN lokal untuk buka offline.
+**Architecture:** Flutter offline-first (Drift/SQLite lokal, token di secure storage) ↔ HTTPS REST (Express) ↔ PostgreSQL dengan isolasi `store_id`. Auth online sekali, lalu PIN lokal untuk buka offline. State: Riverpod 3 `Notifier` + `NotifierProvider` (StateNotifier sudah dihapus dari flutter_riverpod 3.x).
 
-**Tech Stack:** Flutter 3.38+ / Dart 3.10, Riverpod, GoRouter, Drift + sqlite3_flutter_libs, Dio; Backend Node 20+ TypeScript Express + pg + bcryptjs + jsonwebtoken + zod; Postgres 18; vitest + supertest; flutter_test.
+**Tech Stack:** Flutter 3.38+ / Dart 3.10, Riverpod 3 (`Notifier`, bukan StateNotifier), GoRouter, Drift + sqlite3_flutter_libs, Dio; Backend Node 20+ TypeScript Express + pg + bcryptjs + jsonwebtoken + zod; Postgres 18; vitest + supertest; flutter_test.
 
 **Spec:** `docs/superpowers/specs/2026-11-19-pos-warung-design.md`
 
