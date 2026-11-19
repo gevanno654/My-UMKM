@@ -15,9 +15,8 @@ final secureSessionProvider = Provider<SecureSession>((ref) {
 });
 
 final appDbProvider = Provider<AppDb>((ref) {
-  // Produksi tidak bisa async di provider sync: buka file via FutureProvider
-  // di bawah; provider ini hanya fallback bila override test tidak ada.
-  // Nilai default diganti appDbInitProvider setelah main() selesai init.
+  // Default in-memory (dipakai test via override + fallback aman).
+  // Produksi dioverride di main() dengan AppDb.openFile() (pos.db persisten).
   final db = AppDb(openMemoryDb());
   ref.onDispose(db.close);
   return db;
