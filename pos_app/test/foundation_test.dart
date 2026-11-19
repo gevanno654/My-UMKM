@@ -1,4 +1,3 @@
-import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -39,7 +38,7 @@ void main() {
     late AppDb db;
 
     setUp(() {
-      db = AppDb(NativeDatabase.memory());
+      db = AppDb.openMemory();
     });
 
     tearDown(() async {

@@ -1,7 +1,6 @@
 import 'dart:convert';
 
 import 'package:dio/dio.dart';
-import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -62,7 +61,7 @@ Map<String, dynamic> _authSuccessBody() => {
 ({AuthNotifier notifier, SecureSession session, AppDb db, ProviderContainer container})
     makePinEnv({bool failNetwork = false}) {
   final session = SecureSession(storage: MemorySecureStorage());
-  final db = AppDb(NativeDatabase.memory());
+  final db = AppDb.openMemory();
   final dio = Dio(BaseOptions(baseUrl: 'http://localhost:3000'));
   dio.interceptors.add(
     InterceptorsWrapper(
@@ -342,7 +341,7 @@ void main() {
       // lalu pompa ulang agar redirect GoRouter dievaluasi.
       late GoRouter router;
       final session = SecureSession(storage: MemorySecureStorage());
-      final db = AppDb(NativeDatabase.memory());
+      final db = AppDb.openMemory();
       addTearDown(db.close);
       final container = ProviderContainer(
         overrides: [

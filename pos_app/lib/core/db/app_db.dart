@@ -1,5 +1,7 @@
 import 'package:drift/drift.dart';
 
+import 'open_db.dart';
+
 part 'app_db.g.dart';
 
 /// Cache toko dari server. Satu baris per `store_id` server.
@@ -25,6 +27,13 @@ class LocalUsers extends Table {
 @DriftDatabase(tables: [LocalStores, LocalUsers])
 class AppDb extends _$AppDb {
   AppDb(super.executor);
+
+  /// Membuka database file produksi (`pos.db`). Async karena
+  /// [getApplicationDocumentsDirectory] butuh platform channel.
+  static Future<AppDb> openFile() async => AppDb(await openFileDb());
+
+  /// Database in-memory untuk test/widget (tidak menyentuh disk).
+  static AppDb openMemory() => AppDb(openMemoryDb());
 
   @override
   int get schemaVersion => 1;

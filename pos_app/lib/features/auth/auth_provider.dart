@@ -1,10 +1,10 @@
 import 'dart:convert';
 
 import 'package:dio/dio.dart';
-import 'package:drift/native.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/db/app_db.dart';
+import '../../core/db/open_db.dart';
 import '../../core/session/secure_session.dart';
 import 'auth_api.dart';
 import 'auth_state.dart';
@@ -15,7 +15,10 @@ final secureSessionProvider = Provider<SecureSession>((ref) {
 });
 
 final appDbProvider = Provider<AppDb>((ref) {
-  final db = AppDb(NativeDatabase.memory());
+  // Produksi tidak bisa async di provider sync: buka file via FutureProvider
+  // di bawah; provider ini hanya fallback bila override test tidak ada.
+  // Nilai default diganti appDbInitProvider setelah main() selesai init.
+  final db = AppDb(openMemoryDb());
   ref.onDispose(db.close);
   return db;
 });
@@ -109,6 +112,16 @@ class AuthNotifier extends Notifier<AuthState> {
       );
       await bootstrap();
     } on DioException catch (e) {
+      if (e.response?.statusCode == 401) {
+        // Refresh ditolak (kedaluwarsa/dicuri/direvoke): token basi tidak
+        // boleh dipertahankan — hapus sesi agar bootstrap tidak membangkitkan
+        // sesi mati (AuthPinLocked) dari storage basi.
+        await _session.clear();
+        state = const AuthUnauthenticated(
+          error: 'Sesi kedaluwarsa. Silakan login ulang.',
+        );
+        return;
+      }
       state = AuthUnauthenticated(error: AuthApi.friendlyError(e));
     }
   }

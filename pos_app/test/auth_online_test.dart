@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:dio/dio.dart';
-import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -87,7 +86,7 @@ Dio stubDio(FutureOr<Response<dynamic>> Function(RequestOptions) respond) {
   FutureOr<Response<dynamic>> Function(RequestOptions) respond,
 ) {
   final session = SecureSession(storage: MemorySecureStorage());
-  final db = AppDb(NativeDatabase.memory());
+  final db = AppDb.openMemory();
   final container = ProviderContainer(
     overrides: [
       secureSessionProvider.overrideWithValue(session),
@@ -118,7 +117,6 @@ void main() {
   group('AuthNotifier + AuthApi (mock Dio)', () {
     test('login 200 → saveTokens dipanggil + state pinSetupRequired', () async {
       final env = makeNotifier((options) => ok(options, authSuccessBody()));
-      addTearDown(env.db.close);
 
       await env.notifier.login(email: 'budi@warung.id', password: 'rahasia123');
 
@@ -138,7 +136,6 @@ void main() {
 
     test('login 200 + PIN sudah ada → state authenticated', () async {
       final env = makeNotifier((options) => ok(options, authSuccessBody()));
-      addTearDown(env.db.close);
       await env.session.savePinHash(pin: '123456');
 
       await env.notifier.login(email: 'budi@warung.id', password: 'rahasia123');
@@ -150,7 +147,6 @@ void main() {
       final env = makeNotifier(
         (options) => ok(options, authSuccessBody(), 201),
       );
-      addTearDown(env.db.close);
 
       await env.notifier.register(
         storeName: 'Warung Barokah',
@@ -183,14 +179,32 @@ void main() {
         }
         return ok(options, authSuccessBody());
       });
-      addTearDown(env.db.close);
+
+      await env.notifier.login(email: 'budi@warung.id', password: 'rahasia123');
+      await env.notifier.refresh();
+
+      final rotated = await env.session.readTokens();
+      expect(rotated.accessToken, 'access-baru');
+      expect(rotated.refreshToken, 'refresh-baru');
+    });
+
+    test('refresh 401 (revoked) → token dibersihkan + login ulang', () async {
+      final env = makeNotifier((options) {
+        if (options.path == '/api/v1/auth/refresh') {
+          return fail(options, 401, {'error': 'invalid refresh token'});
+        }
+        return ok(options, authSuccessBody());
+      });
 
       await env.notifier.login(email: 'budi@warung.id', password: 'rahasia123');
       await env.notifier.refresh();
 
       final tokens = await env.session.readTokens();
-      expect(tokens.accessToken, 'access-baru');
-      expect(tokens.refreshToken, 'refresh-baru');
+      expect(tokens.accessToken, isNull);
+      expect(tokens.refreshToken, isNull);
+      expect(tokens.profileJson, isNull);
+      expect(env.notifier.state, isA<AuthUnauthenticated>());
+      expect(env.notifier.state.error, contains('login ulang'));
     });
   });
 
@@ -199,7 +213,6 @@ void main() {
       final env = makeNotifier(
         (options) => fail(options, 401, {'error': 'wrong credentials'}),
       );
-      addTearDown(env.db.close);
       await pumpAuthScreen(tester, const LoginScreen(), env.container);
 
       await tester.enterText(
@@ -223,7 +236,6 @@ void main() {
       final env = makeNotifier(
         (options) => fail(options, 409, {'error': 'email taken'}),
       );
-      addTearDown(env.db.close);
       await pumpAuthScreen(tester, const RegisterScreen(), env.container);
 
       await tester.enterText(

@@ -1,11 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'core/db/app_db.dart';
 import 'core/router.dart';
 import 'features/auth/auth_provider.dart';
 
-void main() {
-  runApp(const ProviderScope(child: PosApp()));
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  final db = await AppDb.openFile();
+  runApp(
+    ProviderScope(
+      overrides: [appDbProvider.overrideWithValue(db)],
+      child: const PosApp(),
+    ),
+  );
 }
 
 /// Root aplikasi POS Warung.
