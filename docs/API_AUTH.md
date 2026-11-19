@@ -37,4 +37,5 @@ Header: `Authorization: Bearer <accessToken>`.
 
 - Access JWT: `exp` 15 menit (`ACCESS_TTL`), payload `{ userId, storeId }`.
 - Refresh JWT: `exp` 30 hari (`REFRESH_TTL_DAYS`), payload `{ userId, jti }`, hash SHA-256 disimpan di `refresh_tokens`.
-- Secret dev lihat `backend/.env.example`. JANGAN deploy dengan secret placeholder (server menolak start bila `JWT_*_SECRET` masih placeholder di `NODE_ENV=production`).
+- Server menolak start bila `JWT_*_SECRET` masih placeholder di `NODE_ENV=production`.
+- `ACCESS_TTL` didukung sebagai env (default `15m`).

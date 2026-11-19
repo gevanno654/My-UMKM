@@ -6,19 +6,30 @@ export interface TokenPair {
   refreshToken: string;
 }
 
+const PLACEHOLDERS = new Set(["change-me-32char", "dev-access-secret-change-me", "dev-refresh-secret-change-me"]);
+
+function requiredSecret(name: "JWT_ACCESS_SECRET" | "JWT_REFRESH_SECRET"): string {
+  const value = process.env[name];
+  if (process.env.NODE_ENV === "production" && (!value || PLACEHOLDERS.has(value))) {
+    throw new Error(`${name} must be set to a real secret in production`);
+  }
+  return value ?? (name === "JWT_ACCESS_SECRET" ? "dev-access-secret-change-me" : "dev-refresh-secret-change-me");
+}
+
 function accessSecret(): string {
-  return process.env.JWT_ACCESS_SECRET ?? "dev-access-secret-change-me";
+  return requiredSecret("JWT_ACCESS_SECRET");
 }
 
 function refreshSecret(): string {
-  return process.env.JWT_REFRESH_SECRET ?? "dev-refresh-secret-change-me";
+  return requiredSecret("JWT_REFRESH_SECRET");
 }
 
 export function signAccessToken(payload: {
   userId: string;
   storeId: string;
 }): string {
-  return jwt.sign(payload, accessSecret(), { expiresIn: "15m" });
+  const expiresIn = process.env.ACCESS_TTL ?? "15m";
+  return jwt.sign(payload, accessSecret(), { expiresIn } as jwt.SignOptions);
 }
 
 export function signRefreshToken(userId: string): string {
