@@ -74,6 +74,13 @@ class ProductsNotifier extends Notifier<ProductsState> {
   /// Muat daftar awal untuk toko. Dipanggil sekali per sesi toko.
   Future<void> load(String storeId) async {
     _storeId = storeId;
+    if (_storeId.isEmpty) {
+      state = state.copyWith(
+        loading: false,
+        lastError: () => 'Sesi toko tidak ditemukan. Login ulang.',
+      );
+      return;
+    }
     state = state.copyWith(loading: true, lastError: () => null);
     try {
       await _refreshList();

@@ -1,8 +1,12 @@
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../auth/auth_provider.dart';
+import '../auth/auth_state.dart';
 import 'photo_store.dart';
 import 'products_provider.dart';
 
@@ -20,6 +24,51 @@ class ProductsListScreen extends ConsumerStatefulWidget {
 
 class _ProductsListScreenState extends ConsumerState<ProductsListScreen> {
   final _search = TextEditingController();
+  bool _booted = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _boot());
+  }
+
+  /// Muat daftar toko dari sesi auth SEKALI saat layar dibuka.
+  ///
+  /// Tanpa ini `_storeId` notifier kosong → simpan gagal + sinkron
+  /// menolak ("Toko belum dimuat"). Sumber storeId: state auth bila sudah
+  /// terautentikasi, fallback ke profil tersimpan di secure storage
+  /// (kasus state belum bootstrap).
+  Future<void> _boot() async {
+    if (_booted || !mounted) return;
+    _booted = true;
+    try {
+      final authState = ref.read(authProvider);
+      var storeId = switch (authState) {
+        AuthAuthenticated(profile: final p) => p.storeId,
+        AuthPinSetupRequired(profile: final p) => p.storeId,
+        AuthPinLocked(profile: final p) => p.storeId,
+        _ => '',
+      };
+      if (storeId.isEmpty && mounted) {
+        try {
+          final tokens = await ref.read(secureSessionProvider).readTokens();
+          final raw = tokens.profileJson;
+          if (raw != null && raw.isNotEmpty) {
+            storeId = AuthProfile.fromJson(
+              jsonDecode(raw) as Map<String, dynamic>,
+            ).storeId;
+          }
+        } catch (_) {
+          // Fallback gagal → biarkan storeId kosong, load tetap dipanggil
+          // agar error tampil di UI, bukan macet.
+        }
+      }
+      if (!mounted) return;
+      await ref.read(productsProvider.notifier).load(storeId);
+    } catch (_) {
+      // Boot tidak boleh melempar: error tampil via state.lastError.
+    }
+  }
 
   @override
   void dispose() {

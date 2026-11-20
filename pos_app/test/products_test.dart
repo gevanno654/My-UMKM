@@ -19,6 +19,18 @@ import 'package:pos_app/features/products/products_provider.dart';
 import 'package:pos_app/features/products/products_screens.dart';
 import 'package:pos_app/features/products/scan_screen.dart';
 
+/// Auth state palsu: langsung terautentikasi (untuk repro boot layar produk).
+class _FakeAuthNotifier extends AuthNotifier {
+  static AuthProfile? profile;
+
+  @override
+  AuthState build() {
+    final p = profile;
+    if (p == null) return const AuthUnauthenticated();
+    return AuthAuthenticated(p);
+  }
+}
+
 /// Helper baris produk untuk test repo lokal.
 ProductsCompanion productRow({
   required String id,
@@ -557,6 +569,52 @@ void main() {
 
       expect(find.text('Gula Pasir 1kg'), findsOneWidget);
       expect(find.text('Kopi Tubruk'), findsOneWidget);
+    });
+
+    testWidgets('daftar muat otomatis dari sesi auth (tanpa load manual)', (
+      tester,
+    ) async {
+      // Simulasi alur UI asli: provider fresh (belum load), layar dibuka
+      // APA ADANYA. Auth terautentikasi → layar harus load sendiri dan
+      // daftar tampil tanpa load() manual dari test.
+      _FakeAuthNotifier.profile = const AuthProfile(
+        id: 'user-1',
+        storeId: 'store-1',
+        name: 'Budi',
+        email: 'budi@warung.id',
+        storeName: 'Warung Barokah',
+      );
+      addTearDown(() => _FakeAuthNotifier.profile = null);
+      late AppDb db;
+      await tester.runAsync(() async {
+        db = AppDb.openMemory();
+        await db.upsertProduct(
+          productRow(id: 'p-gula', name: 'Gula Pasir 1kg', updatedAt: 10),
+        );
+      });
+      addTearDown(db.close);
+      final container = ProviderContainer(
+        overrides: [
+          appDbProvider.overrideWithValue(db),
+          authProvider.overrideWith(_FakeAuthNotifier.new),
+        ],
+      );
+      addTearDown(container.dispose);
+      // Boot layar async (postFrame + Drift) + spinner animasi tak berujung:
+      // pump manual, bukan pumpAndSettle.
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(home: ProductsListScreen()),
+        ),
+      );
+      await tester.runAsync(() async {
+        await Future<void>.delayed(const Duration(milliseconds: 500));
+      });
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+
+      expect(find.text('Gula Pasir 1kg'), findsOneWidget);
     });
 
     testWidgets('form: nama kosong → error tampil', (tester) async {
