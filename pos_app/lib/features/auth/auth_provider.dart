@@ -78,6 +78,12 @@ class AuthNotifier extends Notifier<AuthState> {
       await _persistSuccess(result);
     } on DioException catch (e) {
       state = AuthUnauthenticated(error: AuthApi.friendlyError(e));
+    } catch (_) {
+      // Error non-jaringan (mis. gagal tulis cache lokal): jangan macet
+      // di loading — tampilkan pesan agar pengguna bisa coba lagi.
+      state = const AuthUnauthenticated(
+        error: 'Gagal menyimpan sesi. Coba lagi.',
+      );
     }
   }
 
@@ -91,6 +97,10 @@ class AuthNotifier extends Notifier<AuthState> {
       await _persistSuccess(result);
     } on DioException catch (e) {
       state = AuthUnauthenticated(error: AuthApi.friendlyError(e));
+    } catch (_) {
+      state = const AuthUnauthenticated(
+        error: 'Gagal menyimpan sesi. Coba lagi.',
+      );
     }
   }
 
