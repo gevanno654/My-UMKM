@@ -1,14 +1,20 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:drift/drift.dart' hide isNull, isNotNull;
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:pos_app/core/db/app_db.dart';
 import 'package:pos_app/features/auth/auth_provider.dart';
+import 'package:pos_app/features/products/photo_store.dart';
+import 'package:pos_app/features/products/product_form_screen.dart';
 import 'package:pos_app/features/products/product_model.dart';
 import 'package:pos_app/features/products/products_api.dart';
 import 'package:pos_app/features/products/products_provider.dart';
+import 'package:pos_app/features/products/products_screens.dart';
 
 /// Helper baris produk untuk test repo lokal.
 ProductsCompanion productRow({
@@ -469,6 +475,117 @@ void main() {
       expect(env.notifier.state.lastError, contains('Barcode sudah dipakai'));
       expect((await env.db.getProduct('p-ok'))!.dirty, 0);
       expect((await env.db.getProduct('p-konflik'))!.dirty, 1);
+    });
+  });
+
+  group('PhotoStore', () {
+    test('savePicked → path relatif + file ada di temp', () async {
+      final tmp = await Directory.systemTemp.createTemp('photo_store_test');
+      // File sumber 1x1 PNG (cukup untuk uji salin file).
+      final src = File('${tmp.path}/src.png');
+      await src.writeAsBytes(const [
+        0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,
+        0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52,
+        0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+        0x08, 0x06, 0x00, 0x00, 0x00, 0x1F, 0x15, 0xC4,
+        0x89, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x44, 0x41,
+        0x54, 0x78, 0x9C, 0x62, 0x60, 0x00, 0x00, 0x00,
+        0x02, 0x00, 0x01, 0xE5, 0x27, 0xDE, 0xFC, 0x00,
+        0x00, 0x00, 0x00, 0x49, 0x45, 0x4E, 0x44, 0xAE,
+        0x42, 0x60, 0x82,
+      ]);
+      final store = PhotoStore(docsDirOverride: tmp);
+
+      final relative = await store.savePicked(
+        XFile(src.path),
+        filename: 'uji.jpg',
+      );
+
+      expect(relative, startsWith('product_photos/'));
+      expect(relative, endsWith('.jpg'));
+      expect(await (await store.resolve(relative)).exists(), isTrue);
+      expect(relative.contains('..'), isFalse);
+    });
+  });
+
+  group('widget produk (provider mock)', () {
+    // Catatan: seeding Drift + load() harus di dalam tester.runAsync —
+    // await future isolate SQLite langsung di zona fake-async testWidgets
+    // tidak pernah selesai (pola pumpAuthScreen di auth_online_test
+    // menghindari await pra-pump karena alasan yang sama).
+    Future<ProviderContainer> makeWidgetContainer(
+      WidgetTester tester,
+    ) async {
+      final db = AppDb.openMemory();
+      final container = ProviderContainer(
+        overrides: [appDbProvider.overrideWithValue(db)],
+      );
+      addTearDown(db.close);
+      addTearDown(container.dispose);
+      await tester.runAsync(() async {
+        await db.upsertProduct(
+          productRow(id: 'p-gula', name: 'Gula Pasir 1kg', updatedAt: 10),
+        );
+        await db.upsertProduct(
+          productRow(id: 'p-kopi', name: 'Kopi Tubruk', updatedAt: 9),
+        );
+        await container.read(productsProvider.notifier).load('store-1');
+      });
+      return container;
+    }
+
+    Future<void> pumpProducts(
+      WidgetTester tester,
+      Widget screen,
+      ProviderContainer container,
+    ) async {
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(home: screen),
+        ),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('daftar tampil dari provider mock', (tester) async {
+      final container = await makeWidgetContainer(tester);
+      await pumpProducts(tester, const ProductsListScreen(), container);
+
+      expect(find.text('Gula Pasir 1kg'), findsOneWidget);
+      expect(find.text('Kopi Tubruk'), findsOneWidget);
+    });
+
+    testWidgets('form: nama kosong → error tampil', (tester) async {
+      final container = await makeWidgetContainer(tester);
+      await pumpProducts(
+        tester,
+        const ProductFormScreen(),
+        container,
+      );
+
+      await tester.enterText(find.byKey(const Key('costField')), '1000');
+      await tester.enterText(find.byKey(const Key('sellField')), '1500');
+      await tester.tap(find.byKey(const Key('saveButton')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Nama produk wajib diisi'), findsOneWidget);
+    });
+
+    testWidgets('form: harga negatif → error tampil', (tester) async {
+      final container = await makeWidgetContainer(tester);
+      await pumpProducts(
+        tester,
+        const ProductFormScreen(),
+        container,
+      );
+
+      await tester.enterText(find.byKey(const Key('nameField')), 'Gula');
+      await tester.enterText(find.byKey(const Key('sellField')), '-5');
+      await tester.tap(find.byKey(const Key('saveButton')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Harga jual harus angka 0..999999999'), findsOneWidget);
     });
   });
 }
