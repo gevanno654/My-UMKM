@@ -183,6 +183,15 @@ class AppDb extends _$AppDb {
       (update(products)..where((t) => t.id.isIn(ids))).write(
         const ProductsCompanion(dirty: Value(0)),
       );
+
+  /// Baris kotor milik toko (belum ter-push ke server), `updatedAt` menanjak.
+  Future<List<Product>> dirtyProducts(String storeId) =>
+      (select(products)
+            ..where(
+              (t) => t.storeId.equals(storeId) & t.dirty.equals(1),
+            )
+            ..orderBy([(t) => OrderingTerm.asc(t.updatedAt)]))
+          .get();
 }
 
 /// Barcode ''/blank → NULL (kolom nullable, bukan Value.absent).
