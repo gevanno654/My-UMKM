@@ -56,7 +56,9 @@ class AuthNotifier extends Notifier<AuthState> {
     );
     // Sesi ber-PIN selalu dimulai terkunci: wajib unlock offline via PIN.
     // Token access yang kadaluarsa tidak masalah — app tetap buka via PIN.
-    state = tokens.pinHash == null
+    // PIN diikat ke userId (bukan global) agar 2 akun tidak saling memakai.
+    final pinHash = await _session.readPinHash(profile.id);
+    state = pinHash == null
         ? AuthPinSetupRequired(profile)
         : AuthPinLocked(profile);
   }
@@ -136,7 +138,9 @@ class AuthNotifier extends Notifier<AuthState> {
   }
 
   Future<void> logout() async {
-    await _session.clear();
+    // clearSession (bukan clear): PIN per user dipertahankan agar login
+    // ulang akun sama tidak perlu buat PIN baru.
+    await _session.clearSession();
     state = const AuthUnauthenticated();
   }
 
@@ -150,14 +154,15 @@ class AuthNotifier extends Notifier<AuthState> {
   }) async {
     if (!_isSixDigit(pin)) return 'PIN harus 6 digit angka';
     if (pin != confirmPin) return 'Konfirmasi PIN tidak sama';
-    await _session.savePinHash(pin: pin);
+    final setupProfile = switch (state) {
+      AuthPinSetupRequired(profile: final p) => p,
+      _ => null,
+    };
+    if (setupProfile == null) return 'Sesi tidak valid. Login ulang.';
+    await _session.savePinHash(pin: pin, userId: setupProfile.id);
     await _session.resetPinFailCount();
     await _session.clearPinLockedUntil();
-    final tokens = await _session.readTokens();
-    final profile = AuthProfile.fromJson(
-      jsonDecode(tokens.profileJson!) as Map<String, dynamic>,
-    );
-    state = AuthAuthenticated(profile);
+    state = AuthAuthenticated(setupProfile);
     return null;
   }
 
@@ -166,14 +171,15 @@ class AuthNotifier extends Notifier<AuthState> {
   /// Mengembalikan true bila PIN benar (state → [AuthAuthenticated]).
   /// PIN salah / terkunci → state tetap [AuthPinLocked].
   Future<bool> unlockSession(String pin) async {
-    final guard = PinGuard(session: _session);
+    final lockedProfile = switch (state) {
+      AuthPinLocked(profile: final p) => p,
+      _ => null,
+    };
+    if (lockedProfile == null) return false;
+    final guard = PinGuard(session: _session, userId: lockedProfile.id);
     final ok = await guard.verifyPin(pin);
     if (ok) {
-      final tokens = await _session.readTokens();
-      final profile = AuthProfile.fromJson(
-        jsonDecode(tokens.profileJson!) as Map<String, dynamic>,
-      );
-      state = AuthAuthenticated(profile);
+      state = AuthAuthenticated(lockedProfile);
     }
     return ok;
   }
@@ -201,8 +207,8 @@ class AuthNotifier extends Notifier<AuthState> {
         email: result.profile.email,
       ),
     );
-    final tokens = await _session.readTokens();
-    state = tokens.pinHash == null
+    final pinHash = await _session.readPinHash(result.profile.id);
+    state = pinHash == null
         ? AuthPinSetupRequired(result.profile)
         : AuthAuthenticated(result.profile);
   }

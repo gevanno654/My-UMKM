@@ -137,7 +137,7 @@ void main() {
 
     test('login 200 + PIN sudah ada → state authenticated', () async {
       final env = makeNotifier((options) => ok(options, authSuccessBody()));
-      await env.session.savePinHash(pin: '123456');
+      await env.session.savePinHash(pin: '123456', userId: 'user-1');
 
       await env.notifier.login(email: 'budi@warung.id', password: 'rahasia123');
 
@@ -215,7 +215,6 @@ void main() {
         (options) => fail(options, 401, {'error': 'wrong credentials'}),
       );
       await pumpAuthScreen(tester, const LoginScreen(), env.container);
-
       await tester.enterText(
         find.byKey(const Key('emailField')),
         'budi@warung.id',

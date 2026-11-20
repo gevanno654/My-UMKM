@@ -97,14 +97,15 @@ Map<String, dynamic> _authSuccessBody() => {
   return (notifier: notifier, session: session, db: db, container: container);
 }
 
-/// Menyemai sesi lengkap (token + profil + PIN) seperti setelah login + set PIN.
+/// Menyemai sesi lengkap (token + profil + PIN user-1) seperti setelah
+/// login + set PIN.
 Future<void> seedFullSession(SecureSession session) async {
   await session.saveTokens(
     accessToken: 'access-123',
     refreshToken: 'refresh-456',
     profileJson: jsonEncode(_kProfile.toJson()),
   );
-  await session.savePinHash(pin: '123456');
+  await session.savePinHash(pin: '123456', userId: 'user-1');
 }
 
 /// Menjalankan [fn] di luar zona fake-async widget tester agar Dio/Drift
@@ -145,7 +146,13 @@ void main() {
       final env = makePinEnv();
       addTearDown(env.db.close);
 
-      expect(await PinGuard(session: env.session).canUnlockOffline(), isFalse);
+      expect(
+        await PinGuard(
+          session: env.session,
+          userId: 'user-1',
+        ).canUnlockOffline(),
+        isFalse,
+      );
     });
 
     test('true bila pinHash + profileJson + accessToken ada', () async {
@@ -153,7 +160,13 @@ void main() {
       addTearDown(env.db.close);
       await seedFullSession(env.session);
 
-      expect(await PinGuard(session: env.session).canUnlockOffline(), isTrue);
+      expect(
+        await PinGuard(
+          session: env.session,
+          userId: 'user-1',
+        ).canUnlockOffline(),
+        isTrue,
+      );
     });
 
     test('false bila PIN belum diset', () async {
@@ -165,7 +178,13 @@ void main() {
         profileJson: jsonEncode(_kProfile.toJson()),
       );
 
-      expect(await PinGuard(session: env.session).canUnlockOffline(), isFalse);
+      expect(
+        await PinGuard(
+          session: env.session,
+          userId: 'user-1',
+        ).canUnlockOffline(),
+        isFalse,
+      );
     });
   });
 
@@ -193,9 +212,9 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(env.notifier.state, isA<AuthAuthenticated>());
-      final tokens = await env.session.readTokens();
-      expect(tokens.pinHash, isNotNull);
-      expect(tokens.pinHash, isNot(contains('123456')));
+      final hash = await env.session.readPinHash('user-1');
+      expect(hash, isNotNull);
+      expect(hash, isNot(contains('123456')));
       // Berhasil → navigasi ke /home.
       expect(find.byKey(const Key('homeMarker')), findsOneWidget);
     });
@@ -219,7 +238,7 @@ void main() {
 
       expect(find.byKey(const Key('errorText')), findsOneWidget);
       expect(env.notifier.state, isA<AuthPinSetupRequired>());
-      expect((await env.session.readTokens()).pinHash, isNull);
+      expect(await env.session.readPinHash('user-1'), isNull);
     });
   });
 
@@ -247,7 +266,7 @@ void main() {
       final env = makePinEnv();
       addTearDown(env.db.close);
       await seedFullSession(env.session);
-      final guard = PinGuard(session: env.session);
+      final guard = PinGuard(session: env.session, userId: 'user-1');
 
       for (var i = 0; i < 5; i++) {
         expect(await guard.verifyPin('000000'), isFalse);
@@ -261,7 +280,13 @@ void main() {
       expect(remaining.inSeconds, lessThanOrEqualTo(60));
 
       // Lockout tersimpan di storage: guard baru ikut melihat kunci.
-      expect(await PinGuard(session: env.session).lockedUntil(), isNotNull);
+      expect(
+        await PinGuard(
+          session: env.session,
+          userId: 'user-1',
+        ).lockedUntil(),
+        isNotNull,
+      );
       // PIN benar pun ditolak selama terkunci.
       expect(await guard.verifyPin('123456'), isFalse);
     });
@@ -311,6 +336,113 @@ void main() {
 
       expect(env.notifier.state, isA<AuthAuthenticated>());
       expect(find.byKey(const Key('homeMarker')), findsOneWidget);
+    });
+  });
+
+  group('PIN per user (logout pertahankan PIN)', () {
+    test('PIN user-1 tidak berlaku untuk user-2', () async {
+      final env = makePinEnv();
+      addTearDown(env.db.close);
+
+      await env.session.savePinHash(pin: '123456', userId: 'user-1');
+
+      expect(
+        await env.session.verifyPin('123456', userId: 'user-1'),
+        isTrue,
+      );
+      expect(
+        await env.session.verifyPin('123456', userId: 'user-2'),
+        isFalse,
+      );
+    });
+
+    test('clearSession hapus token+profil tapi pertahankan PIN', () async {
+      final env = makePinEnv();
+      addTearDown(env.db.close);
+      await seedFullSession(env.session);
+
+      await env.session.clearSession();
+
+      final tokens = await env.session.readTokens();
+      expect(tokens.accessToken, isNull);
+      expect(tokens.profileJson, isNull);
+      expect(
+        await env.session.verifyPin('123456', userId: 'user-1'),
+        isTrue,
+      );
+    });
+
+    test('logout → login ulang akun sama langsung authenticated', () async {
+      // PIN user-1 sudah ada (seolah dibuat sebelum logout).
+      final env = makePinEnv();
+      addTearDown(env.db.close);
+      await env.session.savePinHash(pin: '123456', userId: 'user-1');
+      await env.notifier.login(
+        email: 'budi@warung.id',
+        password: 'rahasia123',
+      );
+      expect(env.notifier.state, isA<AuthAuthenticated>());
+
+      await env.notifier.logout();
+      expect(env.notifier.state, isA<AuthUnauthenticated>());
+      // Token terhapus, PIN user-1 tetap.
+      expect((await env.session.readTokens()).accessToken, isNull);
+      expect(
+        await env.session.verifyPin('123456', userId: 'user-1'),
+        isTrue,
+      );
+
+      await env.notifier.login(
+        email: 'budi@warung.id',
+        password: 'rahasia123',
+      );
+      expect(env.notifier.state, isA<AuthAuthenticated>());
+    });
+
+    test('akun berbeda di HP sama wajib buat PIN baru', () async {
+      final dio = Dio(BaseOptions(baseUrl: 'http://localhost:3000'));
+      dio.interceptors.add(
+        InterceptorsWrapper(
+          onRequest: (options, handler) {
+            handler.resolve(
+              Response(
+                requestOptions: options,
+                statusCode: 200,
+                data: {
+                  'user': {
+                    'id': 'user-9',
+                    'storeId': 'store-9',
+                    'name': 'Siti',
+                    'email': 'siti@warung.id',
+                  },
+                  'store': {'id': 'store-9', 'name': 'Warung Siti'},
+                  'accessToken': 'access-999',
+                  'refreshToken': 'refresh-999',
+                },
+              ),
+            );
+          },
+        ),
+      );
+      final session = SecureSession(storage: MemorySecureStorage());
+      final db = AppDb.openMemory();
+      addTearDown(db.close);
+      // PIN milik akun lain sudah ada di HP ini.
+      await session.savePinHash(pin: '123456', userId: 'user-1');
+      final container = ProviderContainer(
+        overrides: [
+          secureSessionProvider.overrideWithValue(session),
+          appDbProvider.overrideWithValue(db),
+          authApiProvider.overrideWithValue(AuthApi(dio: dio)),
+        ],
+      );
+      addTearDown(container.dispose);
+      final notifier = container.read(authProvider.notifier);
+
+      await notifier.login(email: 'siti@warung.id', password: 'rahasia123');
+
+      // PIN user-1 tidak boleh dipakai untuk user-9.
+      expect(notifier.state, isA<AuthPinSetupRequired>());
     });
   });
 

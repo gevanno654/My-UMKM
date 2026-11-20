@@ -5,17 +5,20 @@ import '../../core/session/secure_session.dart';
 ///
 /// Semua pemeriksaan murni lokal (secure storage); tidak menyentuh jaringan.
 class PinGuard {
-  PinGuard({required SecureSession session}) : _session = session;
+  PinGuard({required SecureSession session, required String userId})
+      : _session = session,
+        _userId = userId;
 
   final SecureSession _session;
+  final String _userId;
 
   static const maxAttempts = 5;
   static const lockout = Duration(seconds: 60);
 
-  /// true bila `pinHash + profileJson + accessToken` ketiganya ada.
+  /// true bila PIN user ini + profileJson + accessToken ketiganya ada.
   Future<bool> canUnlockOffline() async {
     final tokens = await _session.readTokens();
-    return tokens.pinHash != null &&
+    return (await _session.readPinHash(_userId)) != null &&
         tokens.profileJson != null &&
         tokens.accessToken != null;
   }
@@ -26,7 +29,7 @@ class PinGuard {
   /// PIN benar me-reset counter + kunci.
   Future<bool> verifyPin(String pin) async {
     if (await isLocked()) return false;
-    final ok = await _session.verifyPin(pin);
+    final ok = await _session.verifyPin(pin, userId: _userId);
     if (ok) {
       await _session.resetPinFailCount();
       await _session.clearPinLockedUntil();

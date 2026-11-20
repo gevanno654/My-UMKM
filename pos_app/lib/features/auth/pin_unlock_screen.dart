@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'auth_provider.dart';
+import 'auth_state.dart';
 import 'pin_guard.dart';
 
 /// Layar buka-kunci PIN (murni offline — tanpa panggilan jaringan).
@@ -24,8 +25,17 @@ class _PinUnlockScreenState extends ConsumerState<PinUnlockScreen> {
   }
 
   Future<void> _submit() async {
+    final notifier = ref.read(authProvider.notifier);
+    final userId = switch (ref.read(authProvider)) {
+      AuthPinLocked(profile: final p) => p.id,
+      _ => null,
+    };
+    if (userId == null) {
+      setState(() => _error = 'Sesi tidak valid. Login ulang.');
+      return;
+    }
     final session = ref.read(secureSessionProvider);
-    final guard = PinGuard(session: session);
+    final guard = PinGuard(session: session, userId: userId);
     if (await guard.isLocked()) {
       final until = await guard.lockedUntil();
       final seconds = until == null
@@ -36,7 +46,6 @@ class _PinUnlockScreenState extends ConsumerState<PinUnlockScreen> {
       );
       return;
     }
-    final notifier = ref.read(authProvider.notifier);
     final ok = await notifier.unlockSession(_pin.text);
     if (!mounted) return;
     if (ok) {

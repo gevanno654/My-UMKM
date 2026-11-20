@@ -100,28 +100,28 @@ void main() {
     test('savePinHash menyimpan hash, bukan plaintext', () async {
       final session = SecureSession(storage: MemorySecureStorage());
 
-      await session.savePinHash(pin: '123456');
-      final tokens = await session.readTokens();
+      await session.savePinHash(pin: '123456', userId: 'user-1');
+      final hash = await session.readPinHash('user-1');
 
-      expect(tokens.pinHash, isNotNull);
-      expect(tokens.pinHash, isNot('123456'));
-      expect(tokens.pinHash, isNotEmpty);
+      expect(hash, isNotNull);
+      expect(hash, isNot('123456'));
+      expect(hash, isNotEmpty);
     });
 
-    test('clear menghapus semua sesi', () async {
+    test('clear menghapus semua sesi termasuk PIN', () async {
       final session = SecureSession(storage: MemorySecureStorage());
 
       await session.saveTokens(
         accessToken: 'access-123',
         refreshToken: 'refresh-456',
       );
-      await session.savePinHash(pin: '123456');
+      await session.savePinHash(pin: '123456', userId: 'user-1');
       await session.clear();
       final tokens = await session.readTokens();
 
       expect(tokens.accessToken, isNull);
       expect(tokens.refreshToken, isNull);
-      expect(tokens.pinHash, isNull);
+      expect(await session.readPinHash('user-1'), isNull);
       expect(tokens.profileJson, isNull);
     });
   });

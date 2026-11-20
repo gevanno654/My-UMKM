@@ -35,7 +35,6 @@ class FlutterSecureStorageAdapter implements SecureStorage {
 typedef SessionTokens = ({
   String? accessToken,
   String? refreshToken,
-  String? pinHash,
   String? profileJson,
 });
 
@@ -49,23 +48,24 @@ class SecureSession {
 
   static const keyAccessToken = 'access_token';
   static const keyRefreshToken = 'refresh_token';
-  static const keyPinHash = 'pin_hash';
   static const keyPinSalt = 'pin_salt';
   static const keyProfileJson = 'profile_json';
   static const keyPinFailCount = 'pin_fail_count';
   static const keyPinLockedUntil = 'pin_locked_until';
+
+  /// Kunci PIN milik [userId]. PIN diikat ke akun agar 2 akun di HP
+  /// yang sama tidak saling memakai PIN.
+  static String pinHashKey(String userId) => 'pin_hash_$userId';
 
   final SecureStorage _storage;
 
   Future<SessionTokens> readTokens() async {
     final accessToken = await _storage.read(keyAccessToken);
     final refreshToken = await _storage.read(keyRefreshToken);
-    final pinHash = await _storage.read(keyPinHash);
     final profileJson = await _storage.read(keyProfileJson);
     return (
       accessToken: accessToken,
       refreshToken: refreshToken,
-      pinHash: pinHash,
       profileJson: profileJson,
     );
   }
@@ -86,21 +86,41 @@ class SecureSession {
     }
   }
 
-  Future<void> savePinHash({required String pin}) async {
+  Future<void> savePinHash({
+    required String pin,
+    required String userId,
+  }) async {
     var salt = await _storage.read(keyPinSalt);
     salt ??= _newSalt();
     await _storage.write(keyPinSalt, salt);
-    await _storage.write(keyPinHash, _hashPin(pin, salt));
+    await _storage.write(pinHashKey(userId), _hashPin(pin, salt));
   }
 
-  Future<bool> verifyPin(String pin) async {
+  /// Hash PIN milik [userId]; null bila akun ini belum punya PIN.
+  Future<String?> readPinHash(String userId) =>
+      _storage.read(pinHashKey(userId));
+
+  Future<bool> verifyPin(String pin, {String? userId}) async {
     final salt = await _storage.read(keyPinSalt);
-    final stored = await _storage.read(keyPinHash);
+    final stored = userId == null
+        ? null
+        : await _storage.read(pinHashKey(userId));
     if (salt == null || stored == null) return false;
     return _hashPin(pin, salt) == stored;
   }
 
   Future<void> clear() => _storage.deleteAll();
+
+  /// Hapus sesi login (token + profil + counter/lockout) TANPA menghapus
+  /// PIN per user — dipakai logout agar login ulang tidak perlu buat PIN baru.
+  /// PIN ikut hilang saat install ulang/hapus data (storage dihapus OS).
+  Future<void> clearSession() async {
+    await _storage.delete(keyAccessToken);
+    await _storage.delete(keyRefreshToken);
+    await _storage.delete(keyProfileJson);
+    await _storage.delete(keyPinFailCount);
+    await _storage.delete(keyPinLockedUntil);
+  }
 
   /// Jumlah percobaan PIN salah beruntun (untuk lockout brute-force).
   Future<int> readPinFailCount() async {
