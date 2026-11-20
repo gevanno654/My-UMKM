@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import 'auth_provider.dart';
 import 'auth_state.dart';
@@ -18,7 +19,20 @@ class HomePlaceholder extends ConsumerWidget {
     };
     return Scaffold(
       appBar: AppBar(title: const Text('POS Warung')),
-      body: Center(child: Text('Halo, $name! Kasir segera hadir.')),
+      body: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Halo, $name! Kasir segera hadir.'),
+            const SizedBox(height: 12),
+            ElevatedButton(
+              key: const Key('productsButton'),
+              onPressed: () => context.push('/products'),
+              child: const Text('Kelola Produk'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

@@ -8,13 +8,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:pos_app/core/db/app_db.dart';
+import 'package:pos_app/core/router.dart';
 import 'package:pos_app/features/auth/auth_provider.dart';
+import 'package:pos_app/features/auth/auth_state.dart';
 import 'package:pos_app/features/products/photo_store.dart';
 import 'package:pos_app/features/products/product_form_screen.dart';
 import 'package:pos_app/features/products/product_model.dart';
 import 'package:pos_app/features/products/products_api.dart';
 import 'package:pos_app/features/products/products_provider.dart';
 import 'package:pos_app/features/products/products_screens.dart';
+import 'package:pos_app/features/products/scan_screen.dart';
 
 /// Helper baris produk untuk test repo lokal.
 ProductsCompanion productRow({
@@ -586,6 +589,63 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Harga jual harus angka 0..999999999'), findsOneWidget);
+    });
+  });
+
+  group('router produk', () {
+    const profile = AuthProfile(
+      id: 'user-1',
+      storeId: 'store-1',
+      name: 'Budi',
+      email: 'budi@warung.id',
+      storeName: 'Warung Barokah',
+    );
+
+    test('authRedirect: PinLocked di /products → /pin-unlock', () {
+      expect(
+        authRedirect(const AuthPinLocked(profile), '/products'),
+        '/pin-unlock',
+      );
+    });
+
+    test('authRedirect: PinSetupRequired di /products → /pin-setup', () {
+      expect(
+        authRedirect(const AuthPinSetupRequired(profile), '/products'),
+        '/pin-setup',
+      );
+    });
+
+    test('authRedirect: Authenticated di /products → null', () {
+      expect(
+        authRedirect(const AuthAuthenticated(profile), '/products'),
+        isNull,
+      );
+    });
+
+    test('authRedirect: Unauthenticated di /products → /login', () {
+      expect(
+        authRedirect(const AuthUnauthenticated(), '/products'),
+        '/login',
+      );
+    });
+
+    test('appRoutePaths memuat route produk', () {
+      expect(appRoutePaths, contains('/products'));
+      expect(appRoutePaths, contains('/products/new'));
+      expect(appRoutePaths, contains('/products/scan'));
+      expect(appRoutePaths, contains('/products/:id'));
+      expect(appRoutePaths, contains('/products/:id/edit'));
+    });
+  });
+
+  group('firstBarcode', () {
+    test('ambil barcode valid pertama, abaikan null/kosong', () {
+      expect(firstBarcode([null, '', '  899123 ']), '899123');
+    });
+
+    test('kosong semua → null', () {
+      expect(firstBarcode([]), isNull);
+      expect(firstBarcode([null, '   ']), isNull);
     });
   });
 }

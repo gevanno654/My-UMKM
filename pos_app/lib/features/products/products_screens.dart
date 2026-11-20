@@ -252,10 +252,7 @@ class _ProductsListScreenState extends ConsumerState<ProductsListScreen> {
                                 ],
                               ),
                               onTap: () async {
-                                await context.push(
-                                  '/products/${p.id}',
-                                  extra: p,
-                                );
+                                await context.push('/products/${p.id}');
                               },
                             ),
                           );
@@ -296,7 +293,7 @@ class ProductDetailScreen extends ConsumerWidget {
             icon: const Icon(Icons.edit_outlined),
             onPressed: () async {
               await context.push(
-                '/products/${product.id}',
+                '/products/${product.id}/edit',
                 extra: product,
               );
             },

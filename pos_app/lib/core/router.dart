@@ -7,8 +7,12 @@ import '../features/auth/pin_setup_screen.dart';
 import '../features/auth/pin_unlock_screen.dart';
 import '../features/auth/register_screen.dart';
 import '../features/auth/splash_screen.dart';
+import '../features/products/product_form_screen.dart';
+import '../features/products/product_model.dart';
+import '../features/products/products_screens.dart';
+import '../features/products/scan_screen.dart';
 
-/// Semua route fondasi. Screen PIN sudah asli (Task 5).
+/// Semua route fondasi + produk.
 const appRoutePaths = <String>[
   '/splash',
   '/login',
@@ -16,6 +20,11 @@ const appRoutePaths = <String>[
   '/pin-setup',
   '/pin-unlock',
   '/home',
+  '/products',
+  '/products/new',
+  '/products/scan',
+  '/products/:id',
+  '/products/:id/edit',
 ];
 
 /// Aturan gate auth murni (tanpa I/O) agar mudah diuji:
@@ -88,6 +97,30 @@ GoRouter buildRouter({
       GoRoute(
         path: '/home',
         builder: (context, state) => const HomePlaceholder(),
+      ),
+      GoRoute(
+        path: '/products',
+        builder: (context, state) => const ProductsListScreen(),
+      ),
+      GoRoute(
+        path: '/products/new',
+        builder: (context, state) => const ProductFormScreen(),
+      ),
+      GoRoute(
+        path: '/products/scan',
+        builder: (context, state) => const ScanScreen(),
+      ),
+      GoRoute(
+        path: '/products/:id',
+        builder: (context, state) => ProductDetailScreen(
+          productId: state.pathParameters['id']!,
+        ),
+      ),
+      GoRoute(
+        path: '/products/:id/edit',
+        builder: (context, state) => ProductFormScreen(
+          product: state.extra as ProductModel?,
+        ),
       ),
     ],
   );

@@ -133,9 +133,14 @@ void main() {
       '/pin-setup',
       '/pin-unlock',
       '/home',
+      '/products',
+      '/products/new',
+      '/products/scan',
+      '/products/:id',
+      '/products/:id/edit',
     ];
 
-    test('memetakan 6 route', () {
+    test('memetakan 11 route', () {
       expect(appRoutePaths, unorderedEquals(expectedPaths));
     });
 
