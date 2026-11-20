@@ -9,6 +9,7 @@ import 'package:pos_app/core/session/secure_session.dart';
 import 'package:pos_app/features/auth/auth_api.dart';
 import 'package:pos_app/features/auth/auth_provider.dart';
 import 'package:pos_app/features/auth/auth_state.dart';
+import 'package:pos_app/features/auth/home_placeholder.dart';
 import 'package:pos_app/features/auth/login_screen.dart';
 import 'package:pos_app/features/auth/register_screen.dart';
 
@@ -259,6 +260,36 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Email sudah terdaftar'), findsOneWidget);
+    });
+
+    testWidgets('home: ketuk Keluar → konfirmasi → sesi terhapus', (
+      tester,
+    ) async {
+      final env = makeNotifier((options) => ok(options, authSuccessBody()));
+      await tester.runAsync(() async {
+        await env.notifier.login(
+          email: 'budi@warung.id',
+          password: 'rahasia123',
+        );
+        await env.notifier.completePinSetup(
+          pin: '123456',
+          confirmPin: '123456',
+        );
+      });
+      expect(env.notifier.state, isA<AuthAuthenticated>());
+      await pumpAuthScreen(tester, const HomePlaceholder(), env.container);
+
+      await tester.tap(find.byKey(const Key('logoutButton')));
+      await tester.pumpAndSettle();
+      // Dialog konfirmasi 2 langkah.
+      expect(find.text('Keluar dari akun?'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('confirmLogoutButton')));
+      await tester.pumpAndSettle();
+
+      expect(env.notifier.state, isA<AuthUnauthenticated>());
+      final tokens = await env.session.readTokens();
+      expect(tokens.accessToken, isNull);
+      expect(tokens.profileJson, isNull);
     });
   });
 }

@@ -18,7 +18,17 @@ class HomePlaceholder extends ConsumerWidget {
       _ => 'Pemilik',
     };
     return Scaffold(
-      appBar: AppBar(title: const Text('POS Warung')),
+      appBar: AppBar(
+        title: const Text('POS Warung'),
+        actions: [
+          IconButton(
+            key: const Key('logoutButton'),
+            tooltip: 'Keluar',
+            icon: const Icon(Icons.logout_outlined),
+            onPressed: () => _confirmLogout(context, ref),
+          ),
+        ],
+      ),
       body: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -34,5 +44,31 @@ class HomePlaceholder extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  Future<void> _confirmLogout(BuildContext context, WidgetRef ref) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Keluar dari akun?'),
+        content: const Text(
+          'Sesi di HP ini dihapus. Untuk masuk lagi perlu login ulang + PIN.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Batal'),
+          ),
+          FilledButton(
+            key: const Key('confirmLogoutButton'),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Keluar'),
+          ),
+        ],
+      ),
+    );
+    if (ok == true) {
+      await ref.read(authProvider.notifier).logout();
+    }
   }
 }
