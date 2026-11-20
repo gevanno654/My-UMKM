@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
 
 import '../features/auth/auth_state.dart';
@@ -66,9 +67,11 @@ String? authRedirect(AuthState state, String location) {
 GoRouter buildRouter({
   String initialLocation = '/splash',
   AuthState Function()? authSnapshot,
+  Listenable? refreshListenable,
 }) {
   return GoRouter(
     initialLocation: initialLocation,
+    refreshListenable: refreshListenable,
     redirect: authSnapshot == null
         ? null
         : (context, goState) =>

@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:pos_app/core/db/app_db.dart';
 import 'package:pos_app/core/router.dart';
 import 'package:pos_app/core/session/secure_session.dart';
+import 'package:pos_app/features/auth/auth_provider.dart';
 
 /// In-memory fake dari [SecureStorage] agar test tidak menyentuh
 /// platform channel (flutter_secure_storage).
@@ -205,6 +206,56 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.textContaining('Kasir segera hadir'), findsOneWidget);
+    });
+
+    testWidgets('logout otomatis redirect ke /login tanpa navigasi manual', (
+      tester,
+    ) async {
+      late AppDb db;
+      await tester.runAsync(() async {
+        db = AppDb.openMemory();
+      });
+      final container = ProviderContainer(
+        overrides: [
+          appDbProvider.overrideWithValue(db),
+          secureSessionProvider.overrideWithValue(
+            SecureSession(storage: MemorySecureStorage()),
+          ),
+        ],
+      );
+      // Cerminkan wiring produksi: setiap perubahan auth me-refresh router.
+      final refresh = ChangeNotifier();
+      final sub = container.listen(authProvider, (prev, next) {
+        refresh.notifyListeners();
+      });
+      addTearDown(() async {
+        sub.close();
+        refresh.dispose();
+        container.dispose();
+        await db.close();
+      });
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp.router(
+            routerConfig: buildRouter(
+              initialLocation: '/home',
+              authSnapshot: () => container.read(authProvider),
+              refreshListenable: refresh,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Kasir segera hadir'), findsOneWidget);
+
+      await tester.runAsync(() async {
+        await container.read(authProvider.notifier).logout();
+      });
+      await tester.pumpAndSettle();
+
+      expect(find.text('Masuk'), findsWidgets);
+      expect(find.textContaining('Kasir segera hadir'), findsNothing);
     });
   });
 }
