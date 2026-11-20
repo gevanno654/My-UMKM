@@ -4,9 +4,19 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { getPool, closePool } from "../src/db";
 
-const dir = path.dirname(fileURLToPath(import.meta.url));
-const sql = fs.readFileSync(path.join(dir, "..", "migrations", "001_init.sql"), "utf8");
+async function main() {
+  const dir = path.dirname(fileURLToPath(import.meta.url));
+  const migrationsDir = path.join(dir, "..", "migrations");
+  const files = fs
+    .readdirSync(migrationsDir)
+    .filter((f: string) => f.endsWith(".sql"))
+    .sort();
+  for (const file of files) {
+    const sql = fs.readFileSync(path.join(migrationsDir, file), "utf8");
+    await getPool().query(sql);
+    console.log(`migration ok: ${file}`);
+  }
+  await closePool();
+}
 
-await getPool().query(sql);
-await closePool();
-console.log("migration ok: 001_init.sql");
+void main();
