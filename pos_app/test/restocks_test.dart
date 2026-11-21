@@ -306,5 +306,84 @@ void main() {
 
       expect(env.notifier.state.syncStatus, restocks.SyncStatus.offline);
     });
+
+    test(
+      'produk di server sudah ada (PUT ok) -> restock terkirim, idle',
+      () async {
+        final events = <String>[];
+        final env = await makeRestocks(
+          apiHandler: (options) async {
+            if (options.method == 'PUT') {
+              events.add('product');
+              return ok(options, {
+                'id': 'p1',
+                'name': 'Indomie',
+                'barcode': null,
+                'costPrice': 2600,
+                'sellPrice': 3500,
+                'stock': 12,
+                'category': '',
+                'photoPath': '',
+                'updatedAt': '2026-01-01T00:00:00.000Z',
+                'deletedAt': null,
+              });
+            }
+            if (options.method == 'POST' &&
+                options.path.endsWith('/restocks')) {
+              events.add('restock');
+              return ok(options, restockJson(), 201);
+            }
+            return ok(options, []);
+          },
+        );
+        await env.notifier.addToDraft('p1', qty: 1);
+        await env.notifier.saveRestock();
+
+        await env.notifier.syncNow(accessToken: 'token');
+
+        expect(events, ['product', 'restock']);
+        expect(env.notifier.state.syncStatus, restocks.SyncStatus.idle);
+        expect(env.notifier.state.lastError, isNull);
+      },
+    );
+
+    test(
+      'produk gagal push (barcode bentrok 409) -> restock tidak dipaksa, '
+      'pesan jelas bukan 404 generik',
+      () async {
+        final events = <String>[];
+        final env = await makeRestocks(
+          apiHandler: (options) async {
+            if (options.method == 'PUT') {
+              return fail(options, 404, {'error': 'not found'});
+            }
+            // POST produk bentrok barcode dengan produk lain di server.
+            if (options.method == 'POST' &&
+                options.path.endsWith('/products')) {
+              events.add('product-attempt');
+              return fail(options, 409, {'error': 'barcode taken'});
+            }
+            if (options.method == 'POST' &&
+                options.path.endsWith('/restocks')) {
+              events.add('restock');
+              return ok(options, restockJson(), 201);
+            }
+            return ok(options, []);
+          },
+        );
+        await env.notifier.addToDraft('p1', qty: 1);
+        await env.notifier.saveRestock();
+
+        await env.notifier.syncNow(accessToken: 'token');
+
+        // Restock TIDAK boleh di-POST buta saat produknya gagal push.
+        expect(events, isNot(contains('restock')));
+        expect(env.notifier.state.syncStatus, restocks.SyncStatus.error);
+        expect(
+          env.notifier.state.lastError,
+          contains('Barcode sudah dipakai'),
+        );
+      },
+    );
   });
 }

@@ -374,7 +374,13 @@ class RestocksNotifier extends Notifier<RestocksState> {
       try {
         // Sinkron restock sekaligus sinkron produk: produk terkait di-push
         // DULU (stok cloud ikut terkini), baru restock di-POST sekali.
-        await _pushMissingProducts(accessToken, row.id);
+        // Bila ada produk gagal push (mis. barcode bentrok), restock tidak
+        // dipaksa terkirim — user perbaiki dulu di Kelola Produk.
+        final productError = await _pushMissingProducts(accessToken, row.id);
+        if (productError != null) {
+          onRowError(productError);
+          continue;
+        }
         await _postRestock(accessToken, row.id);
         await _db.markRestocksClean([row.id]);
       } on DioException catch (e) {
@@ -409,8 +415,10 @@ class RestocksNotifier extends Notifier<RestocksState> {
   }
 
   /// Push produk-produk dalam restock yang dirty, lalu tandai bersih.
+  /// Mengembalikan pesan error Indonesia bila ada produk gagal push
+  /// (null bila semua ok / tidak ada yang perlu di-push).
   /// Pola sama dengan SalesNotifier._pushMissingProducts.
-  Future<void> _pushMissingProducts(
+  Future<String?> _pushMissingProducts(
     String accessToken,
     String restockId,
   ) async {
@@ -433,10 +441,13 @@ class RestocksNotifier extends Notifier<RestocksState> {
         }
         await _db.markClean([productId]);
       } on DioException catch (e) {
-        if (e.response?.statusCode == 409) continue;
+        if (e.response?.statusCode == 409) {
+          return ProductsApi.friendlyError(e);
+        }
         rethrow;
       }
     }
+    return null;
   }
 
   Future<void> _pull(String accessToken) async {
