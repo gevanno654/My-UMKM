@@ -100,6 +100,42 @@ class SaleItems extends Table {
   Set<Column> get primaryKey => {id};
 }
 
+/// Penerimaan kulakan (offline-first, sumber utama HP).
+///
+/// - `total`: total modal Σ qty×harga beli.
+/// - `status`: 'ok' | 'voided'; void butuh `voidReason`.
+/// - Tanpa nomor struk (tidak seperti sales).
+class Restocks extends Table {
+  TextColumn get id => text()();
+  TextColumn get storeId => text()();
+  IntColumn get total => integer()();
+  TextColumn get status => text().withDefault(const Constant('ok'))();
+  TextColumn get voidReason => text().nullable()();
+  IntColumn get createdAt => integer()();
+  IntColumn get updatedAt => integer().nullable()();
+  IntColumn get voidedAt => integer().nullable()();
+  IntColumn get dirty => integer().withDefault(const Constant(1))();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// Baris item penerimaan: snapshot nama + harga beli saat kulakan.
+/// `sellPrice` null = harga jual katalog tidak diubah.
+class RestockItems extends Table {
+  TextColumn get id => text()();
+  TextColumn get restockId => text()();
+  TextColumn get productId => text().nullable()();
+  TextColumn get name => text()();
+  IntColumn get qty => integer()();
+  IntColumn get costPrice => integer()();
+  IntColumn get sellPrice => integer().nullable()();
+  IntColumn get subtotal => integer()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
 /// Keranjang belanja persist (tahan pindah layar + restart HP).
 /// Satu baris per (storeId, productId).
 class CartLines extends Table {
@@ -111,7 +147,7 @@ class CartLines extends Table {
   Set<Column> get primaryKey => {storeId, productId};
 }
 
-@DriftDatabase(tables: [LocalStores, LocalUsers, Products, Sales, SaleItems, CartLines])
+@DriftDatabase(tables: [LocalStores, LocalUsers, Products, Sales, SaleItems, CartLines, Restocks, RestockItems])
 class AppDb extends _$AppDb {
   AppDb(super.executor);
 
@@ -123,7 +159,7 @@ class AppDb extends _$AppDb {
   static AppDb openMemory() => AppDb(openMemoryDb());
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -140,6 +176,11 @@ class AppDb extends _$AppDb {
         await m.createTable(sales);
         await m.createTable(saleItems);
         await m.createTable(cartLines);
+      }
+      // v3 → v4: tambah tabel restock (restocks, restock_items).
+      if (from <= 3) {
+        await m.createTable(restocks);
+        await m.createTable(restockItems);
       }
     },
   );
@@ -390,6 +431,134 @@ class AppDb extends _$AppDb {
       await (delete(saleItems)..where((t) => t.saleId.equals(saleId))).go();
       for (final item in items) {
         await into(saleItems).insert(item);
+      }
+    });
+  }
+
+  // ------------------------------------------------------------------
+  // Restock (penerimaan kulakan atomik, batal beraudit, sinkron).
+  // ------------------------------------------------------------------
+
+  /// Simpan penerimaan atomik: insert restock + items, stok `+= qty`,
+  /// harga beli katalog diperbarui (dan jual bila `sellPrice` non-null).
+  /// Produk jadi `dirty` (ikut push sinkron). Throw [StateError] bila
+  /// produk tidak ada (tidak ada yang berubah).
+  Future<void> saveRestockFull({
+    required RestocksCompanion restock,
+    required List<RestockItemsCompanion> items,
+  }) {
+    return transaction(() async {
+      for (final item in items) {
+        final productId = item.productId.value;
+        if (productId == null) {
+          throw StateError('product not found');
+        }
+        final product = await getProduct(productId);
+        if (product == null) {
+          throw StateError('product not found');
+        }
+        await (update(products)..where((t) => t.id.equals(productId))).write(
+          ProductsCompanion(
+            stock: Value(product.stock + item.qty.value),
+            costPrice: Value(item.costPrice.value),
+            sellPrice: item.sellPrice.value == null
+                ? const Value.absent()
+                : Value(item.sellPrice.value!),
+            updatedAt: Value(DateTime.now().toUtc().millisecondsSinceEpoch),
+            dirty: const Value(1),
+          ),
+        );
+      }
+      await into(restocks).insert(restock.copyWith(dirty: const Value(1)));
+      for (final item in items) {
+        await into(restockItems).insert(item);
+      }
+    });
+  }
+
+  Future<Restock?> getRestock(String id) =>
+      (select(restocks)..where((t) => t.id.equals(id))).getSingleOrNull();
+
+  /// Riwayat penerimaan toko, terbaru dulu.
+  Future<List<Restock>> restocksHistory(String storeId) =>
+      (select(restocks)
+            ..where((t) => t.storeId.equals(storeId))
+            ..orderBy([(t) => OrderingTerm.desc(t.createdAt)]))
+          .get();
+
+  Future<List<RestockItem>> restockItemsOf(String restockId) =>
+      (select(restockItems)..where((t) => t.restockId.equals(restockId))).get();
+
+  /// Batal beraudit: status → voided + alasan wajib, stok dikembalikan.
+  /// Throw [ArgumentError] bila alasan kosong, [StateError] bila stok kini
+  /// kurang (sudah terlanjur terjual) — tidak ada yang berubah.
+  Future<void> voidRestock({
+    required String id,
+    required String reason,
+    required int nowMillis,
+  }) {
+    if (reason.trim().isEmpty) {
+      throw ArgumentError('Alasan batal wajib diisi');
+    }
+    return transaction(() async {
+      final items = await restockItemsOf(id);
+      for (final item in items) {
+        final productId = item.productId;
+        if (productId == null) continue;
+        final product = await getProduct(productId);
+        if (product == null) continue; // produk terhapus: stok tak kembali
+        if (product.stock < item.qty) {
+          throw StateError('insufficient stock');
+        }
+        await (update(products)..where((t) => t.id.equals(productId))).write(
+          ProductsCompanion(
+            stock: Value(product.stock - item.qty),
+            updatedAt: Value(nowMillis),
+            dirty: const Value(1),
+          ),
+        );
+      }
+      await (update(restocks)..where((t) => t.id.equals(id))).write(
+        RestocksCompanion(
+          status: const Value('voided'),
+          voidReason: Value(reason.trim()),
+          voidedAt: Value(nowMillis),
+          updatedAt: Value(nowMillis),
+          dirty: const Value(1),
+        ),
+      );
+    });
+  }
+
+  /// Tandai restock sudah tersinkron (push sukses).
+  Future<void> markRestocksClean(List<String> ids) =>
+      (update(restocks)..where((t) => t.id.isIn(ids))).write(
+        const RestocksCompanion(dirty: Value(0)),
+      );
+
+  /// Restock kotor milik toko (belum ter-push ke server).
+  Future<List<Restock>> dirtyRestocks(String storeId) =>
+      (select(restocks)
+            ..where((t) => t.storeId.equals(storeId) & t.dirty.equals(1))
+            ..orderBy([(t) => OrderingTerm.asc(t.createdAt)]))
+          .get();
+
+  /// Upsert restock dari server (pull): baris server selalu bersih.
+  /// Status voided server menang atas ok lokal.
+  Future<void> upsertRestockFromServer(RestocksCompanion entry) =>
+      into(restocks).insertOnConflictUpdate(
+        entry.copyWith(dirty: const Value(0)),
+      );
+
+  Future<void> replaceRestockItems(
+    String restockId,
+    List<RestockItemsCompanion> items,
+  ) {
+    return transaction(() async {
+      await (delete(restockItems)..where((t) => t.restockId.equals(restockId)))
+          .go();
+      for (final item in items) {
+        await into(restockItems).insert(item);
       }
     });
   }

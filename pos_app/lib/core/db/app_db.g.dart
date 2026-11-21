@@ -2771,6 +2771,1070 @@ class CartLinesCompanion extends UpdateCompanion<CartLine> {
   }
 }
 
+class $RestocksTable extends Restocks with TableInfo<$RestocksTable, Restock> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $RestocksTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _storeIdMeta = const VerificationMeta(
+    'storeId',
+  );
+  @override
+  late final GeneratedColumn<String> storeId = GeneratedColumn<String>(
+    'store_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _totalMeta = const VerificationMeta('total');
+  @override
+  late final GeneratedColumn<int> total = GeneratedColumn<int>(
+    'total',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _statusMeta = const VerificationMeta('status');
+  @override
+  late final GeneratedColumn<String> status = GeneratedColumn<String>(
+    'status',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('ok'),
+  );
+  static const VerificationMeta _voidReasonMeta = const VerificationMeta(
+    'voidReason',
+  );
+  @override
+  late final GeneratedColumn<String> voidReason = GeneratedColumn<String>(
+    'void_reason',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<int> createdAt = GeneratedColumn<int>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<int> updatedAt = GeneratedColumn<int>(
+    'updated_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _voidedAtMeta = const VerificationMeta(
+    'voidedAt',
+  );
+  @override
+  late final GeneratedColumn<int> voidedAt = GeneratedColumn<int>(
+    'voided_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _dirtyMeta = const VerificationMeta('dirty');
+  @override
+  late final GeneratedColumn<int> dirty = GeneratedColumn<int>(
+    'dirty',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(1),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    storeId,
+    total,
+    status,
+    voidReason,
+    createdAt,
+    updatedAt,
+    voidedAt,
+    dirty,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'restocks';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<Restock> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('store_id')) {
+      context.handle(
+        _storeIdMeta,
+        storeId.isAcceptableOrUnknown(data['store_id']!, _storeIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_storeIdMeta);
+    }
+    if (data.containsKey('total')) {
+      context.handle(
+        _totalMeta,
+        total.isAcceptableOrUnknown(data['total']!, _totalMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_totalMeta);
+    }
+    if (data.containsKey('status')) {
+      context.handle(
+        _statusMeta,
+        status.isAcceptableOrUnknown(data['status']!, _statusMeta),
+      );
+    }
+    if (data.containsKey('void_reason')) {
+      context.handle(
+        _voidReasonMeta,
+        voidReason.isAcceptableOrUnknown(data['void_reason']!, _voidReasonMeta),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    }
+    if (data.containsKey('voided_at')) {
+      context.handle(
+        _voidedAtMeta,
+        voidedAt.isAcceptableOrUnknown(data['voided_at']!, _voidedAtMeta),
+      );
+    }
+    if (data.containsKey('dirty')) {
+      context.handle(
+        _dirtyMeta,
+        dirty.isAcceptableOrUnknown(data['dirty']!, _dirtyMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  Restock map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return Restock(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      storeId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}store_id'],
+      )!,
+      total: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}total'],
+      )!,
+      status: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}status'],
+      )!,
+      voidReason: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}void_reason'],
+      ),
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}created_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}updated_at'],
+      ),
+      voidedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}voided_at'],
+      ),
+      dirty: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}dirty'],
+      )!,
+    );
+  }
+
+  @override
+  $RestocksTable createAlias(String alias) {
+    return $RestocksTable(attachedDatabase, alias);
+  }
+}
+
+class Restock extends DataClass implements Insertable<Restock> {
+  final String id;
+  final String storeId;
+  final int total;
+  final String status;
+  final String? voidReason;
+  final int createdAt;
+  final int? updatedAt;
+  final int? voidedAt;
+  final int dirty;
+  const Restock({
+    required this.id,
+    required this.storeId,
+    required this.total,
+    required this.status,
+    this.voidReason,
+    required this.createdAt,
+    this.updatedAt,
+    this.voidedAt,
+    required this.dirty,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['store_id'] = Variable<String>(storeId);
+    map['total'] = Variable<int>(total);
+    map['status'] = Variable<String>(status);
+    if (!nullToAbsent || voidReason != null) {
+      map['void_reason'] = Variable<String>(voidReason);
+    }
+    map['created_at'] = Variable<int>(createdAt);
+    if (!nullToAbsent || updatedAt != null) {
+      map['updated_at'] = Variable<int>(updatedAt);
+    }
+    if (!nullToAbsent || voidedAt != null) {
+      map['voided_at'] = Variable<int>(voidedAt);
+    }
+    map['dirty'] = Variable<int>(dirty);
+    return map;
+  }
+
+  RestocksCompanion toCompanion(bool nullToAbsent) {
+    return RestocksCompanion(
+      id: Value(id),
+      storeId: Value(storeId),
+      total: Value(total),
+      status: Value(status),
+      voidReason: voidReason == null && nullToAbsent
+          ? const Value.absent()
+          : Value(voidReason),
+      createdAt: Value(createdAt),
+      updatedAt: updatedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(updatedAt),
+      voidedAt: voidedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(voidedAt),
+      dirty: Value(dirty),
+    );
+  }
+
+  factory Restock.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return Restock(
+      id: serializer.fromJson<String>(json['id']),
+      storeId: serializer.fromJson<String>(json['storeId']),
+      total: serializer.fromJson<int>(json['total']),
+      status: serializer.fromJson<String>(json['status']),
+      voidReason: serializer.fromJson<String?>(json['voidReason']),
+      createdAt: serializer.fromJson<int>(json['createdAt']),
+      updatedAt: serializer.fromJson<int?>(json['updatedAt']),
+      voidedAt: serializer.fromJson<int?>(json['voidedAt']),
+      dirty: serializer.fromJson<int>(json['dirty']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'storeId': serializer.toJson<String>(storeId),
+      'total': serializer.toJson<int>(total),
+      'status': serializer.toJson<String>(status),
+      'voidReason': serializer.toJson<String?>(voidReason),
+      'createdAt': serializer.toJson<int>(createdAt),
+      'updatedAt': serializer.toJson<int?>(updatedAt),
+      'voidedAt': serializer.toJson<int?>(voidedAt),
+      'dirty': serializer.toJson<int>(dirty),
+    };
+  }
+
+  Restock copyWith({
+    String? id,
+    String? storeId,
+    int? total,
+    String? status,
+    Value<String?> voidReason = const Value.absent(),
+    int? createdAt,
+    Value<int?> updatedAt = const Value.absent(),
+    Value<int?> voidedAt = const Value.absent(),
+    int? dirty,
+  }) => Restock(
+    id: id ?? this.id,
+    storeId: storeId ?? this.storeId,
+    total: total ?? this.total,
+    status: status ?? this.status,
+    voidReason: voidReason.present ? voidReason.value : this.voidReason,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt.present ? updatedAt.value : this.updatedAt,
+    voidedAt: voidedAt.present ? voidedAt.value : this.voidedAt,
+    dirty: dirty ?? this.dirty,
+  );
+  Restock copyWithCompanion(RestocksCompanion data) {
+    return Restock(
+      id: data.id.present ? data.id.value : this.id,
+      storeId: data.storeId.present ? data.storeId.value : this.storeId,
+      total: data.total.present ? data.total.value : this.total,
+      status: data.status.present ? data.status.value : this.status,
+      voidReason: data.voidReason.present
+          ? data.voidReason.value
+          : this.voidReason,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      voidedAt: data.voidedAt.present ? data.voidedAt.value : this.voidedAt,
+      dirty: data.dirty.present ? data.dirty.value : this.dirty,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('Restock(')
+          ..write('id: $id, ')
+          ..write('storeId: $storeId, ')
+          ..write('total: $total, ')
+          ..write('status: $status, ')
+          ..write('voidReason: $voidReason, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('voidedAt: $voidedAt, ')
+          ..write('dirty: $dirty')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    storeId,
+    total,
+    status,
+    voidReason,
+    createdAt,
+    updatedAt,
+    voidedAt,
+    dirty,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is Restock &&
+          other.id == this.id &&
+          other.storeId == this.storeId &&
+          other.total == this.total &&
+          other.status == this.status &&
+          other.voidReason == this.voidReason &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt &&
+          other.voidedAt == this.voidedAt &&
+          other.dirty == this.dirty);
+}
+
+class RestocksCompanion extends UpdateCompanion<Restock> {
+  final Value<String> id;
+  final Value<String> storeId;
+  final Value<int> total;
+  final Value<String> status;
+  final Value<String?> voidReason;
+  final Value<int> createdAt;
+  final Value<int?> updatedAt;
+  final Value<int?> voidedAt;
+  final Value<int> dirty;
+  final Value<int> rowid;
+  const RestocksCompanion({
+    this.id = const Value.absent(),
+    this.storeId = const Value.absent(),
+    this.total = const Value.absent(),
+    this.status = const Value.absent(),
+    this.voidReason = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.voidedAt = const Value.absent(),
+    this.dirty = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  RestocksCompanion.insert({
+    required String id,
+    required String storeId,
+    required int total,
+    this.status = const Value.absent(),
+    this.voidReason = const Value.absent(),
+    required int createdAt,
+    this.updatedAt = const Value.absent(),
+    this.voidedAt = const Value.absent(),
+    this.dirty = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       storeId = Value(storeId),
+       total = Value(total),
+       createdAt = Value(createdAt);
+  static Insertable<Restock> custom({
+    Expression<String>? id,
+    Expression<String>? storeId,
+    Expression<int>? total,
+    Expression<String>? status,
+    Expression<String>? voidReason,
+    Expression<int>? createdAt,
+    Expression<int>? updatedAt,
+    Expression<int>? voidedAt,
+    Expression<int>? dirty,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (storeId != null) 'store_id': storeId,
+      if (total != null) 'total': total,
+      if (status != null) 'status': status,
+      if (voidReason != null) 'void_reason': voidReason,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (voidedAt != null) 'voided_at': voidedAt,
+      if (dirty != null) 'dirty': dirty,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  RestocksCompanion copyWith({
+    Value<String>? id,
+    Value<String>? storeId,
+    Value<int>? total,
+    Value<String>? status,
+    Value<String?>? voidReason,
+    Value<int>? createdAt,
+    Value<int?>? updatedAt,
+    Value<int?>? voidedAt,
+    Value<int>? dirty,
+    Value<int>? rowid,
+  }) {
+    return RestocksCompanion(
+      id: id ?? this.id,
+      storeId: storeId ?? this.storeId,
+      total: total ?? this.total,
+      status: status ?? this.status,
+      voidReason: voidReason ?? this.voidReason,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      voidedAt: voidedAt ?? this.voidedAt,
+      dirty: dirty ?? this.dirty,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (storeId.present) {
+      map['store_id'] = Variable<String>(storeId.value);
+    }
+    if (total.present) {
+      map['total'] = Variable<int>(total.value);
+    }
+    if (status.present) {
+      map['status'] = Variable<String>(status.value);
+    }
+    if (voidReason.present) {
+      map['void_reason'] = Variable<String>(voidReason.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<int>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<int>(updatedAt.value);
+    }
+    if (voidedAt.present) {
+      map['voided_at'] = Variable<int>(voidedAt.value);
+    }
+    if (dirty.present) {
+      map['dirty'] = Variable<int>(dirty.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('RestocksCompanion(')
+          ..write('id: $id, ')
+          ..write('storeId: $storeId, ')
+          ..write('total: $total, ')
+          ..write('status: $status, ')
+          ..write('voidReason: $voidReason, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('voidedAt: $voidedAt, ')
+          ..write('dirty: $dirty, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $RestockItemsTable extends RestockItems
+    with TableInfo<$RestockItemsTable, RestockItem> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $RestockItemsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _restockIdMeta = const VerificationMeta(
+    'restockId',
+  );
+  @override
+  late final GeneratedColumn<String> restockId = GeneratedColumn<String>(
+    'restock_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _productIdMeta = const VerificationMeta(
+    'productId',
+  );
+  @override
+  late final GeneratedColumn<String> productId = GeneratedColumn<String>(
+    'product_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+    'name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _qtyMeta = const VerificationMeta('qty');
+  @override
+  late final GeneratedColumn<int> qty = GeneratedColumn<int>(
+    'qty',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _costPriceMeta = const VerificationMeta(
+    'costPrice',
+  );
+  @override
+  late final GeneratedColumn<int> costPrice = GeneratedColumn<int>(
+    'cost_price',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _sellPriceMeta = const VerificationMeta(
+    'sellPrice',
+  );
+  @override
+  late final GeneratedColumn<int> sellPrice = GeneratedColumn<int>(
+    'sell_price',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _subtotalMeta = const VerificationMeta(
+    'subtotal',
+  );
+  @override
+  late final GeneratedColumn<int> subtotal = GeneratedColumn<int>(
+    'subtotal',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    restockId,
+    productId,
+    name,
+    qty,
+    costPrice,
+    sellPrice,
+    subtotal,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'restock_items';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<RestockItem> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('restock_id')) {
+      context.handle(
+        _restockIdMeta,
+        restockId.isAcceptableOrUnknown(data['restock_id']!, _restockIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_restockIdMeta);
+    }
+    if (data.containsKey('product_id')) {
+      context.handle(
+        _productIdMeta,
+        productId.isAcceptableOrUnknown(data['product_id']!, _productIdMeta),
+      );
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+        _nameMeta,
+        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_nameMeta);
+    }
+    if (data.containsKey('qty')) {
+      context.handle(
+        _qtyMeta,
+        qty.isAcceptableOrUnknown(data['qty']!, _qtyMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_qtyMeta);
+    }
+    if (data.containsKey('cost_price')) {
+      context.handle(
+        _costPriceMeta,
+        costPrice.isAcceptableOrUnknown(data['cost_price']!, _costPriceMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_costPriceMeta);
+    }
+    if (data.containsKey('sell_price')) {
+      context.handle(
+        _sellPriceMeta,
+        sellPrice.isAcceptableOrUnknown(data['sell_price']!, _sellPriceMeta),
+      );
+    }
+    if (data.containsKey('subtotal')) {
+      context.handle(
+        _subtotalMeta,
+        subtotal.isAcceptableOrUnknown(data['subtotal']!, _subtotalMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_subtotalMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  RestockItem map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return RestockItem(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      restockId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}restock_id'],
+      )!,
+      productId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}product_id'],
+      ),
+      name: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name'],
+      )!,
+      qty: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}qty'],
+      )!,
+      costPrice: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}cost_price'],
+      )!,
+      sellPrice: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}sell_price'],
+      ),
+      subtotal: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}subtotal'],
+      )!,
+    );
+  }
+
+  @override
+  $RestockItemsTable createAlias(String alias) {
+    return $RestockItemsTable(attachedDatabase, alias);
+  }
+}
+
+class RestockItem extends DataClass implements Insertable<RestockItem> {
+  final String id;
+  final String restockId;
+  final String? productId;
+  final String name;
+  final int qty;
+  final int costPrice;
+  final int? sellPrice;
+  final int subtotal;
+  const RestockItem({
+    required this.id,
+    required this.restockId,
+    this.productId,
+    required this.name,
+    required this.qty,
+    required this.costPrice,
+    this.sellPrice,
+    required this.subtotal,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['restock_id'] = Variable<String>(restockId);
+    if (!nullToAbsent || productId != null) {
+      map['product_id'] = Variable<String>(productId);
+    }
+    map['name'] = Variable<String>(name);
+    map['qty'] = Variable<int>(qty);
+    map['cost_price'] = Variable<int>(costPrice);
+    if (!nullToAbsent || sellPrice != null) {
+      map['sell_price'] = Variable<int>(sellPrice);
+    }
+    map['subtotal'] = Variable<int>(subtotal);
+    return map;
+  }
+
+  RestockItemsCompanion toCompanion(bool nullToAbsent) {
+    return RestockItemsCompanion(
+      id: Value(id),
+      restockId: Value(restockId),
+      productId: productId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(productId),
+      name: Value(name),
+      qty: Value(qty),
+      costPrice: Value(costPrice),
+      sellPrice: sellPrice == null && nullToAbsent
+          ? const Value.absent()
+          : Value(sellPrice),
+      subtotal: Value(subtotal),
+    );
+  }
+
+  factory RestockItem.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return RestockItem(
+      id: serializer.fromJson<String>(json['id']),
+      restockId: serializer.fromJson<String>(json['restockId']),
+      productId: serializer.fromJson<String?>(json['productId']),
+      name: serializer.fromJson<String>(json['name']),
+      qty: serializer.fromJson<int>(json['qty']),
+      costPrice: serializer.fromJson<int>(json['costPrice']),
+      sellPrice: serializer.fromJson<int?>(json['sellPrice']),
+      subtotal: serializer.fromJson<int>(json['subtotal']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'restockId': serializer.toJson<String>(restockId),
+      'productId': serializer.toJson<String?>(productId),
+      'name': serializer.toJson<String>(name),
+      'qty': serializer.toJson<int>(qty),
+      'costPrice': serializer.toJson<int>(costPrice),
+      'sellPrice': serializer.toJson<int?>(sellPrice),
+      'subtotal': serializer.toJson<int>(subtotal),
+    };
+  }
+
+  RestockItem copyWith({
+    String? id,
+    String? restockId,
+    Value<String?> productId = const Value.absent(),
+    String? name,
+    int? qty,
+    int? costPrice,
+    Value<int?> sellPrice = const Value.absent(),
+    int? subtotal,
+  }) => RestockItem(
+    id: id ?? this.id,
+    restockId: restockId ?? this.restockId,
+    productId: productId.present ? productId.value : this.productId,
+    name: name ?? this.name,
+    qty: qty ?? this.qty,
+    costPrice: costPrice ?? this.costPrice,
+    sellPrice: sellPrice.present ? sellPrice.value : this.sellPrice,
+    subtotal: subtotal ?? this.subtotal,
+  );
+  RestockItem copyWithCompanion(RestockItemsCompanion data) {
+    return RestockItem(
+      id: data.id.present ? data.id.value : this.id,
+      restockId: data.restockId.present ? data.restockId.value : this.restockId,
+      productId: data.productId.present ? data.productId.value : this.productId,
+      name: data.name.present ? data.name.value : this.name,
+      qty: data.qty.present ? data.qty.value : this.qty,
+      costPrice: data.costPrice.present ? data.costPrice.value : this.costPrice,
+      sellPrice: data.sellPrice.present ? data.sellPrice.value : this.sellPrice,
+      subtotal: data.subtotal.present ? data.subtotal.value : this.subtotal,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('RestockItem(')
+          ..write('id: $id, ')
+          ..write('restockId: $restockId, ')
+          ..write('productId: $productId, ')
+          ..write('name: $name, ')
+          ..write('qty: $qty, ')
+          ..write('costPrice: $costPrice, ')
+          ..write('sellPrice: $sellPrice, ')
+          ..write('subtotal: $subtotal')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    restockId,
+    productId,
+    name,
+    qty,
+    costPrice,
+    sellPrice,
+    subtotal,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is RestockItem &&
+          other.id == this.id &&
+          other.restockId == this.restockId &&
+          other.productId == this.productId &&
+          other.name == this.name &&
+          other.qty == this.qty &&
+          other.costPrice == this.costPrice &&
+          other.sellPrice == this.sellPrice &&
+          other.subtotal == this.subtotal);
+}
+
+class RestockItemsCompanion extends UpdateCompanion<RestockItem> {
+  final Value<String> id;
+  final Value<String> restockId;
+  final Value<String?> productId;
+  final Value<String> name;
+  final Value<int> qty;
+  final Value<int> costPrice;
+  final Value<int?> sellPrice;
+  final Value<int> subtotal;
+  final Value<int> rowid;
+  const RestockItemsCompanion({
+    this.id = const Value.absent(),
+    this.restockId = const Value.absent(),
+    this.productId = const Value.absent(),
+    this.name = const Value.absent(),
+    this.qty = const Value.absent(),
+    this.costPrice = const Value.absent(),
+    this.sellPrice = const Value.absent(),
+    this.subtotal = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  RestockItemsCompanion.insert({
+    required String id,
+    required String restockId,
+    this.productId = const Value.absent(),
+    required String name,
+    required int qty,
+    required int costPrice,
+    this.sellPrice = const Value.absent(),
+    required int subtotal,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       restockId = Value(restockId),
+       name = Value(name),
+       qty = Value(qty),
+       costPrice = Value(costPrice),
+       subtotal = Value(subtotal);
+  static Insertable<RestockItem> custom({
+    Expression<String>? id,
+    Expression<String>? restockId,
+    Expression<String>? productId,
+    Expression<String>? name,
+    Expression<int>? qty,
+    Expression<int>? costPrice,
+    Expression<int>? sellPrice,
+    Expression<int>? subtotal,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (restockId != null) 'restock_id': restockId,
+      if (productId != null) 'product_id': productId,
+      if (name != null) 'name': name,
+      if (qty != null) 'qty': qty,
+      if (costPrice != null) 'cost_price': costPrice,
+      if (sellPrice != null) 'sell_price': sellPrice,
+      if (subtotal != null) 'subtotal': subtotal,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  RestockItemsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? restockId,
+    Value<String?>? productId,
+    Value<String>? name,
+    Value<int>? qty,
+    Value<int>? costPrice,
+    Value<int?>? sellPrice,
+    Value<int>? subtotal,
+    Value<int>? rowid,
+  }) {
+    return RestockItemsCompanion(
+      id: id ?? this.id,
+      restockId: restockId ?? this.restockId,
+      productId: productId ?? this.productId,
+      name: name ?? this.name,
+      qty: qty ?? this.qty,
+      costPrice: costPrice ?? this.costPrice,
+      sellPrice: sellPrice ?? this.sellPrice,
+      subtotal: subtotal ?? this.subtotal,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (restockId.present) {
+      map['restock_id'] = Variable<String>(restockId.value);
+    }
+    if (productId.present) {
+      map['product_id'] = Variable<String>(productId.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (qty.present) {
+      map['qty'] = Variable<int>(qty.value);
+    }
+    if (costPrice.present) {
+      map['cost_price'] = Variable<int>(costPrice.value);
+    }
+    if (sellPrice.present) {
+      map['sell_price'] = Variable<int>(sellPrice.value);
+    }
+    if (subtotal.present) {
+      map['subtotal'] = Variable<int>(subtotal.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('RestockItemsCompanion(')
+          ..write('id: $id, ')
+          ..write('restockId: $restockId, ')
+          ..write('productId: $productId, ')
+          ..write('name: $name, ')
+          ..write('qty: $qty, ')
+          ..write('costPrice: $costPrice, ')
+          ..write('sellPrice: $sellPrice, ')
+          ..write('subtotal: $subtotal, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDb extends GeneratedDatabase {
   _$AppDb(QueryExecutor e) : super(e);
   $AppDbManager get managers => $AppDbManager(this);
@@ -2780,6 +3844,8 @@ abstract class _$AppDb extends GeneratedDatabase {
   late final $SalesTable sales = $SalesTable(this);
   late final $SaleItemsTable saleItems = $SaleItemsTable(this);
   late final $CartLinesTable cartLines = $CartLinesTable(this);
+  late final $RestocksTable restocks = $RestocksTable(this);
+  late final $RestockItemsTable restockItems = $RestockItemsTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -2791,6 +3857,8 @@ abstract class _$AppDb extends GeneratedDatabase {
     sales,
     saleItems,
     cartLines,
+    restocks,
+    restockItems,
   ];
 }
 
@@ -4205,6 +5273,531 @@ typedef $$CartLinesTableProcessedTableManager =
       CartLine,
       PrefetchHooks Function()
     >;
+typedef $$RestocksTableCreateCompanionBuilder =
+    RestocksCompanion Function({
+      required String id,
+      required String storeId,
+      required int total,
+      Value<String> status,
+      Value<String?> voidReason,
+      required int createdAt,
+      Value<int?> updatedAt,
+      Value<int?> voidedAt,
+      Value<int> dirty,
+      Value<int> rowid,
+    });
+typedef $$RestocksTableUpdateCompanionBuilder =
+    RestocksCompanion Function({
+      Value<String> id,
+      Value<String> storeId,
+      Value<int> total,
+      Value<String> status,
+      Value<String?> voidReason,
+      Value<int> createdAt,
+      Value<int?> updatedAt,
+      Value<int?> voidedAt,
+      Value<int> dirty,
+      Value<int> rowid,
+    });
+
+class $$RestocksTableFilterComposer extends Composer<_$AppDb, $RestocksTable> {
+  $$RestocksTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get storeId => $composableBuilder(
+    column: $table.storeId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get total => $composableBuilder(
+    column: $table.total,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get voidReason => $composableBuilder(
+    column: $table.voidReason,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get voidedAt => $composableBuilder(
+    column: $table.voidedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get dirty => $composableBuilder(
+    column: $table.dirty,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$RestocksTableOrderingComposer
+    extends Composer<_$AppDb, $RestocksTable> {
+  $$RestocksTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get storeId => $composableBuilder(
+    column: $table.storeId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get total => $composableBuilder(
+    column: $table.total,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get voidReason => $composableBuilder(
+    column: $table.voidReason,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get voidedAt => $composableBuilder(
+    column: $table.voidedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get dirty => $composableBuilder(
+    column: $table.dirty,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$RestocksTableAnnotationComposer
+    extends Composer<_$AppDb, $RestocksTable> {
+  $$RestocksTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get storeId =>
+      $composableBuilder(column: $table.storeId, builder: (column) => column);
+
+  GeneratedColumn<int> get total =>
+      $composableBuilder(column: $table.total, builder: (column) => column);
+
+  GeneratedColumn<String> get status =>
+      $composableBuilder(column: $table.status, builder: (column) => column);
+
+  GeneratedColumn<String> get voidReason => $composableBuilder(
+    column: $table.voidReason,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<int> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<int> get voidedAt =>
+      $composableBuilder(column: $table.voidedAt, builder: (column) => column);
+
+  GeneratedColumn<int> get dirty =>
+      $composableBuilder(column: $table.dirty, builder: (column) => column);
+}
+
+class $$RestocksTableTableManager
+    extends
+        RootTableManager<
+          _$AppDb,
+          $RestocksTable,
+          Restock,
+          $$RestocksTableFilterComposer,
+          $$RestocksTableOrderingComposer,
+          $$RestocksTableAnnotationComposer,
+          $$RestocksTableCreateCompanionBuilder,
+          $$RestocksTableUpdateCompanionBuilder,
+          (Restock, BaseReferences<_$AppDb, $RestocksTable, Restock>),
+          Restock,
+          PrefetchHooks Function()
+        > {
+  $$RestocksTableTableManager(_$AppDb db, $RestocksTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$RestocksTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$RestocksTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$RestocksTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> storeId = const Value.absent(),
+                Value<int> total = const Value.absent(),
+                Value<String> status = const Value.absent(),
+                Value<String?> voidReason = const Value.absent(),
+                Value<int> createdAt = const Value.absent(),
+                Value<int?> updatedAt = const Value.absent(),
+                Value<int?> voidedAt = const Value.absent(),
+                Value<int> dirty = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => RestocksCompanion(
+                id: id,
+                storeId: storeId,
+                total: total,
+                status: status,
+                voidReason: voidReason,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                voidedAt: voidedAt,
+                dirty: dirty,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String storeId,
+                required int total,
+                Value<String> status = const Value.absent(),
+                Value<String?> voidReason = const Value.absent(),
+                required int createdAt,
+                Value<int?> updatedAt = const Value.absent(),
+                Value<int?> voidedAt = const Value.absent(),
+                Value<int> dirty = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => RestocksCompanion.insert(
+                id: id,
+                storeId: storeId,
+                total: total,
+                status: status,
+                voidReason: voidReason,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                voidedAt: voidedAt,
+                dirty: dirty,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$RestocksTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDb,
+      $RestocksTable,
+      Restock,
+      $$RestocksTableFilterComposer,
+      $$RestocksTableOrderingComposer,
+      $$RestocksTableAnnotationComposer,
+      $$RestocksTableCreateCompanionBuilder,
+      $$RestocksTableUpdateCompanionBuilder,
+      (Restock, BaseReferences<_$AppDb, $RestocksTable, Restock>),
+      Restock,
+      PrefetchHooks Function()
+    >;
+typedef $$RestockItemsTableCreateCompanionBuilder =
+    RestockItemsCompanion Function({
+      required String id,
+      required String restockId,
+      Value<String?> productId,
+      required String name,
+      required int qty,
+      required int costPrice,
+      Value<int?> sellPrice,
+      required int subtotal,
+      Value<int> rowid,
+    });
+typedef $$RestockItemsTableUpdateCompanionBuilder =
+    RestockItemsCompanion Function({
+      Value<String> id,
+      Value<String> restockId,
+      Value<String?> productId,
+      Value<String> name,
+      Value<int> qty,
+      Value<int> costPrice,
+      Value<int?> sellPrice,
+      Value<int> subtotal,
+      Value<int> rowid,
+    });
+
+class $$RestockItemsTableFilterComposer
+    extends Composer<_$AppDb, $RestockItemsTable> {
+  $$RestockItemsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get restockId => $composableBuilder(
+    column: $table.restockId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get productId => $composableBuilder(
+    column: $table.productId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get qty => $composableBuilder(
+    column: $table.qty,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get costPrice => $composableBuilder(
+    column: $table.costPrice,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get sellPrice => $composableBuilder(
+    column: $table.sellPrice,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get subtotal => $composableBuilder(
+    column: $table.subtotal,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$RestockItemsTableOrderingComposer
+    extends Composer<_$AppDb, $RestockItemsTable> {
+  $$RestockItemsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get restockId => $composableBuilder(
+    column: $table.restockId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get productId => $composableBuilder(
+    column: $table.productId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get qty => $composableBuilder(
+    column: $table.qty,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get costPrice => $composableBuilder(
+    column: $table.costPrice,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get sellPrice => $composableBuilder(
+    column: $table.sellPrice,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get subtotal => $composableBuilder(
+    column: $table.subtotal,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$RestockItemsTableAnnotationComposer
+    extends Composer<_$AppDb, $RestockItemsTable> {
+  $$RestockItemsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get restockId =>
+      $composableBuilder(column: $table.restockId, builder: (column) => column);
+
+  GeneratedColumn<String> get productId =>
+      $composableBuilder(column: $table.productId, builder: (column) => column);
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<int> get qty =>
+      $composableBuilder(column: $table.qty, builder: (column) => column);
+
+  GeneratedColumn<int> get costPrice =>
+      $composableBuilder(column: $table.costPrice, builder: (column) => column);
+
+  GeneratedColumn<int> get sellPrice =>
+      $composableBuilder(column: $table.sellPrice, builder: (column) => column);
+
+  GeneratedColumn<int> get subtotal =>
+      $composableBuilder(column: $table.subtotal, builder: (column) => column);
+}
+
+class $$RestockItemsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDb,
+          $RestockItemsTable,
+          RestockItem,
+          $$RestockItemsTableFilterComposer,
+          $$RestockItemsTableOrderingComposer,
+          $$RestockItemsTableAnnotationComposer,
+          $$RestockItemsTableCreateCompanionBuilder,
+          $$RestockItemsTableUpdateCompanionBuilder,
+          (
+            RestockItem,
+            BaseReferences<_$AppDb, $RestockItemsTable, RestockItem>,
+          ),
+          RestockItem,
+          PrefetchHooks Function()
+        > {
+  $$RestockItemsTableTableManager(_$AppDb db, $RestockItemsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$RestockItemsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$RestockItemsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$RestockItemsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> restockId = const Value.absent(),
+                Value<String?> productId = const Value.absent(),
+                Value<String> name = const Value.absent(),
+                Value<int> qty = const Value.absent(),
+                Value<int> costPrice = const Value.absent(),
+                Value<int?> sellPrice = const Value.absent(),
+                Value<int> subtotal = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => RestockItemsCompanion(
+                id: id,
+                restockId: restockId,
+                productId: productId,
+                name: name,
+                qty: qty,
+                costPrice: costPrice,
+                sellPrice: sellPrice,
+                subtotal: subtotal,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String restockId,
+                Value<String?> productId = const Value.absent(),
+                required String name,
+                required int qty,
+                required int costPrice,
+                Value<int?> sellPrice = const Value.absent(),
+                required int subtotal,
+                Value<int> rowid = const Value.absent(),
+              }) => RestockItemsCompanion.insert(
+                id: id,
+                restockId: restockId,
+                productId: productId,
+                name: name,
+                qty: qty,
+                costPrice: costPrice,
+                sellPrice: sellPrice,
+                subtotal: subtotal,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$RestockItemsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDb,
+      $RestockItemsTable,
+      RestockItem,
+      $$RestockItemsTableFilterComposer,
+      $$RestockItemsTableOrderingComposer,
+      $$RestockItemsTableAnnotationComposer,
+      $$RestockItemsTableCreateCompanionBuilder,
+      $$RestockItemsTableUpdateCompanionBuilder,
+      (RestockItem, BaseReferences<_$AppDb, $RestockItemsTable, RestockItem>),
+      RestockItem,
+      PrefetchHooks Function()
+    >;
 
 class $AppDbManager {
   final _$AppDb _db;
@@ -4221,4 +5814,8 @@ class $AppDbManager {
       $$SaleItemsTableTableManager(_db, _db.saleItems);
   $$CartLinesTableTableManager get cartLines =>
       $$CartLinesTableTableManager(_db, _db.cartLines);
+  $$RestocksTableTableManager get restocks =>
+      $$RestocksTableTableManager(_db, _db.restocks);
+  $$RestockItemsTableTableManager get restockItems =>
+      $$RestockItemsTableTableManager(_db, _db.restockItems);
 }

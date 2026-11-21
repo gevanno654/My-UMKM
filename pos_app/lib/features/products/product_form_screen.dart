@@ -7,9 +7,10 @@ import 'photo_store.dart';
 import 'product_model.dart';
 import 'products_provider.dart';
 
-/// Form tambah/ubah produk: field nama/barcode/harga/stok/kategori + foto
+/// Form tambah/ubah produk: field nama/barcode/harga/kategori + foto
 /// (dialog Kamera/Galeri → preview → hapus foto). Scan barcode via kamera
-/// diarahkan ke `/products/scan` (route dipasang Task 5).
+/// diarahkan ke `/products/scan`. Stok TIDAK bisa diubah di sini:
+/// produk baru selalu stok 0, penambahan lewat Restock.
 class ProductFormScreen extends ConsumerStatefulWidget {
   const ProductFormScreen({super.key, this.product});
 
@@ -25,7 +26,6 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
   late final TextEditingController _barcode;
   late final TextEditingController _cost;
   late final TextEditingController _sell;
-  late final TextEditingController _stock;
   late final TextEditingController _category;
 
   String _photoPath = '';
@@ -44,7 +44,6 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
     _barcode = TextEditingController(text: p?.barcode ?? '');
     _cost = TextEditingController(text: p == null ? '' : '${p.costPrice}');
     _sell = TextEditingController(text: p == null ? '' : '${p.sellPrice}');
-    _stock = TextEditingController(text: p == null ? '' : '${p.stock}');
     _category = TextEditingController(text: p?.category ?? '');
     _photoPath = p?.photoPath ?? '';
   }
@@ -55,7 +54,6 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
     _barcode.dispose();
     _cost.dispose();
     _sell.dispose();
-    _stock.dispose();
     _category.dispose();
     super.dispose();
   }
@@ -124,11 +122,12 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
     if (_saving) return;
     setState(() => _submitError = null);
     if (!_formKey.currentState!.validate()) return;
+    final existingForStock = widget.product;
     final error = ProductModel.validate(
       name: _name.text,
       costPrice: _parseInt(_cost.text),
       sellPrice: _parseInt(_sell.text),
-      stock: _parseInt(_stock.text),
+      stock: existingForStock?.stock ?? 0,
       category: _category.text,
     );
     if (error != null) {
@@ -147,7 +146,7 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
               barcode: ProductModel.normalizeBarcode(_barcode.text),
               costPrice: _parseInt(_cost.text),
               sellPrice: _parseInt(_sell.text),
-              stock: _parseInt(_stock.text),
+              stock: existing.stock,
               category: _category.text.trim(),
               photoPath: _photoPath,
               isArchived: existing.isArchived,
@@ -160,7 +159,6 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
               barcode: ProductModel.normalizeBarcode(_barcode.text),
               costPrice: _parseInt(_cost.text),
               sellPrice: _parseInt(_sell.text),
-              stock: _parseInt(_stock.text),
               category: _category.text.trim(),
               photoPath: _photoPath,
             );
@@ -334,32 +332,24 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
                 ],
               ),
               const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextFormField(
-                      key: const Key('stockField'),
-                      controller: _stock,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(labelText: 'Stok'),
-                      validator: (v) => _numberValidator(v, 'Stok'),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: TextFormField(
-                      key: const Key('categoryField'),
-                      controller: _category,
-                      decoration: const InputDecoration(
-                        labelText: 'Kategori (opsional)',
-                      ),
-                      validator: (v) => (v ?? '').length > 50
-                          ? 'Kategori maksimal 50 karakter'
-                          : null,
-                    ),
-                  ),
-                ],
+              TextFormField(
+                key: const Key('categoryField'),
+                controller: _category,
+                decoration: const InputDecoration(
+                  labelText: 'Kategori (opsional)',
+                ),
+                validator: (v) => (v ?? '').length > 50
+                    ? 'Kategori maksimal 50 karakter'
+                    : null,
               ),
+              if (_editing)
+                ListTile(
+                  key: const Key('stockInfo'),
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Stok'),
+                  subtitle: const Text('Ubah via Restock'),
+                  trailing: Text('${widget.product!.stock}'),
+                ),
               const SizedBox(height: 20),
               ElevatedButton(
                 key: const Key('saveButton'),
