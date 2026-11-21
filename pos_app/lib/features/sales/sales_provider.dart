@@ -5,6 +5,8 @@ import 'package:uuid/uuid.dart';
 
 import '../../core/db/app_db.dart';
 import '../auth/auth_provider.dart';
+import '../products/products_api.dart';
+import '../products/products_provider.dart';
 import 'sale_model.dart';
 import 'sales_api.dart';
 
@@ -66,6 +68,7 @@ class SalesNotifier extends Notifier<SalesState> {
   static const _uuid = Uuid();
 
   late final SalesApi _api;
+  late final ProductsApi _productsApi;
   late final AppDb _db;
 
   String _storeId = '';
@@ -74,6 +77,7 @@ class SalesNotifier extends Notifier<SalesState> {
   @override
   SalesState build() {
     _api = ref.watch(salesApiProvider);
+    _productsApi = ref.watch(productsApiProvider);
     _db = ref.watch(appDbProvider);
     return const SalesState();
   }
@@ -261,32 +265,88 @@ class SalesNotifier extends Notifier<SalesState> {
   ) async {
     final dirty = await _db.dirtySales(_storeId);
     for (final row in dirty) {
-      final items = await _db.saleItemsOf(row.id);
       try {
-        await _api.create(
-          accessToken: accessToken,
-          id: row.id,
-          number: row.number,
-          items: items
-              .map(
-                (i) => SaleItemModel(
-                  id: i.id,
-                  productId: i.productId,
-                  name: i.name,
-                  price: i.price,
-                  qty: i.qty,
-                ),
-              )
-              .toList(),
-          paid: row.paid,
-          method: PayMethod.values.byName(row.method),
-        );
+        await _postSale(accessToken, row);
         await _db.markSalesClean([row.id]);
       } on DioException catch (e) {
         if (e.response?.statusCode == 409) {
           onRowError(SalesApi.friendlyError(e));
           continue;
         }
+        // Produk di sale belum ada di server (dibuat setelah backup /
+        // belum sync produk): push katalog terkait dulu, lalu ulangi sekali.
+        if (_isProductNotFound(e)) {
+          await _pushMissingProducts(accessToken, row.id);
+          try {
+            await _postSale(accessToken, row);
+          } on DioException catch (retryError) {
+            if (retryError.response?.statusCode == 409) {
+              onRowError(SalesApi.friendlyError(retryError));
+              continue;
+            }
+            rethrow;
+          }
+          await _db.markSalesClean([row.id]);
+          continue;
+        }
+        rethrow;
+      }
+    }
+  }
+
+  /// POST satu sale kotor ke server.
+  Future<void> _postSale(String accessToken, Sale row) async {
+    final items = await _db.saleItemsOf(row.id);
+    await _api.create(
+      accessToken: accessToken,
+      id: row.id,
+      number: row.number,
+      items: items
+          .map(
+            (i) => SaleItemModel(
+              id: i.id,
+              productId: i.productId,
+              name: i.name,
+              price: i.price,
+              qty: i.qty,
+            ),
+          )
+          .toList(),
+      paid: row.paid,
+      method: PayMethod.values.byName(row.method),
+    );
+  }
+
+  /// 404 'product not found' dari POST /sales.
+  bool _isProductNotFound(DioException e) {
+    if (e.response?.statusCode != 404) return false;
+    final data = e.response?.data;
+    return data is Map && data['error'] == 'product not found';
+  }
+
+  /// Push produk-produk dalam sale yang masih dirty (belum ada di server),
+  /// lalu tandai bersih. Pola sama dengan ProductsNotifier._push.
+  Future<void> _pushMissingProducts(String accessToken, String saleId) async {
+    final items = await _db.saleItemsOf(saleId);
+    for (final item in items) {
+      final productId = item.productId;
+      if (productId == null) continue;
+      final product = await _db.getProduct(productId);
+      if (product == null || product.deletedAt != null) continue;
+      final model = product.toModel();
+      try {
+        try {
+          await _productsApi.update(accessToken, model);
+        } on DioException catch (e) {
+          if (e.response?.statusCode == 404) {
+            await _productsApi.create(accessToken, model);
+          } else {
+            rethrow;
+          }
+        }
+        await _db.markClean([productId]);
+      } on DioException catch (e) {
+        if (e.response?.statusCode == 409) continue;
         rethrow;
       }
     }

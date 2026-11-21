@@ -4,9 +4,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pos_app/core/db/app_db.dart';
 import 'package:pos_app/features/auth/auth_provider.dart';
+import 'package:pos_app/features/products/products_api.dart';
 import 'package:pos_app/features/sales/sale_model.dart';
 import 'package:pos_app/features/sales/sales_api.dart';
-import 'package:pos_app/features/sales/sales_provider.dart';
+import 'package:pos_app/features/products/products_provider.dart' as products;
+import 'package:pos_app/features/sales/sales_provider.dart' as sales;
 
 /// Notifier palsu: Dio di-intercept, respons dari handler per URL+method.
 /// Handler melempar DioException untuk mensimulasikan status error.
@@ -73,17 +75,15 @@ Map<String, dynamic> saleJson({
 };
 
 /// Env notifier kasir: produk p1 (Indomie 3500, stok 5) sudah ada.
-Future<({SalesNotifier notifier, AppDb db})> makeSales({
+Future<({sales.SalesNotifier notifier, AppDb db})> makeSales({
   Future<Response<dynamic>> Function(RequestOptions options)? apiHandler,
 }) async {
+  final dio = apiHandler == null ? Dio() : fakeDio(apiHandler);
   final container = ProviderContainer(
     overrides: [
       appDbProvider.overrideWithValue(AppDb.openMemory()),
-      salesApiProvider.overrideWithValue(
-        SalesApi(
-          dio: apiHandler == null ? Dio() : fakeDio(apiHandler),
-        ),
-      ),
+      sales.salesApiProvider.overrideWithValue(SalesApi(dio: dio)),
+      products.productsApiProvider.overrideWithValue(ProductsApi(dio: dio)),
     ],
   );
   addTearDown(container.dispose);
@@ -118,7 +118,7 @@ Future<({SalesNotifier notifier, AppDb db})> makeSales({
       updatedAt: 1,
     ),
   );
-  final notifier = container.read(salesProvider.notifier);
+  final notifier = container.read(sales.salesProvider.notifier);
   await notifier.load('store-1', storeName: 'Toko Evan');
   return (notifier: notifier, db: db);
 }
@@ -259,6 +259,67 @@ void main() {
   });
 
   group('sinkron manual', () {
+    test('sale berisi produk belum di server -> push katalog dulu lalu retry', () async {
+      // Root cause HP: checkout memakai produk baru (belum sync produk),
+      // POST /sales 404 'product not found'. Perilaku benar: push produk
+      // terkait yang masih dirty, lalu ulangi POST sale sekali.
+      var productPushed = false;
+      var saleAttempts = 0;
+      final env = await makeSales(
+        apiHandler: (options) async {
+          if (options.method == 'PUT') {
+            return fail(options, 404, {'error': 'not found'});
+          }
+          if (options.method == 'POST' &&
+              options.path.endsWith('/products')) {
+            productPushed = true;
+            return ok(options, {
+              'id': 'p3',
+              'name': 'Kopi',
+              'barcode': null,
+              'costPrice': 2000,
+              'sellPrice': 3000,
+              'stock': 10,
+              'category': '',
+              'photoPath': '',
+              'updatedAt': '2026-01-01T00:00:00.000Z',
+              'deletedAt': null,
+            }, 201);
+          }
+          if (options.method == 'POST' && options.path.endsWith('/sales')) {
+            saleAttempts++;
+            if (!productPushed) {
+              return fail(options, 404, {'error': 'product not found'});
+            }
+            return ok(options, saleJson(), 201);
+          }
+          return ok(options, []);
+        },
+      );
+      await env.notifier.addItem('p1', 1);
+      await env.notifier.checkout(paid: 3500, method: PayMethod.tunai);
+      // Produk baru dibuat setelah transaksi (belum pernah sync).
+      await env.db.upsertProduct(
+        ProductsCompanion.insert(
+          id: 'p3',
+          storeId: 'store-1',
+          name: 'Kopi',
+          barcode: const Value.absent(),
+          costPrice: 2000,
+          sellPrice: 3000,
+          createdAt: 2,
+          updatedAt: 2,
+        ),
+      );
+
+      await env.notifier.syncNow(accessToken: 'token');
+
+      expect(productPushed, isTrue);
+      expect(saleAttempts, 2);
+      expect(env.notifier.state.syncStatus, sales.SyncStatus.idle);
+      expect(env.notifier.state.lastError, isNull);
+    });
+
     test('push sale kotor -> bersih + pull server masuk', () async {
       final env = await makeSales(
         apiHandler: (options) async {
@@ -275,7 +336,7 @@ void main() {
 
       await env.notifier.syncNow(accessToken: 'token');
 
-      expect(env.notifier.state.syncStatus, SyncStatus.idle);
+      expect(env.notifier.state.syncStatus, sales.SyncStatus.idle);
       expect(env.notifier.state.history.length, 2);
       expect(
         env.notifier.state.history.map((s) => s.id),
@@ -283,8 +344,7 @@ void main() {
       );
     });
 
-    test('nomor duplikat 409 -> pesan buat ulang', () async {
-      final env = await makeSales(
+    test('nomor duplikat 409 -> pesan buat ulang', () async {      final env = await makeSales(
         apiHandler: (options) async {
           if (options.method == 'POST') {
             return fail(options, 409, {'error': 'number taken'});
@@ -297,7 +357,7 @@ void main() {
 
       await env.notifier.syncNow(accessToken: 'token');
 
-      expect(env.notifier.state.syncStatus, SyncStatus.error);
+      expect(env.notifier.state.syncStatus, sales.SyncStatus.error);
       expect(
         env.notifier.state.lastError,
         contains('Nomor struk sudah dipakai'),
@@ -305,3 +365,5 @@ void main() {
     });
   });
 }
+
+
