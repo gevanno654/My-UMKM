@@ -29,6 +29,7 @@ async function applyMigration(file: string) {
 beforeAll(async () => {
   await applyMigration("001_init.sql");
   await applyMigration("002_products.sql");
+  await applyMigration("005_products_barcode_active.sql");
   await getPool().query(
     "TRUNCATE refresh_tokens, users, products, stores RESTART IDENTITY CASCADE",
   );
@@ -134,5 +135,19 @@ describe("DELETE /api/v1/products/:id", () => {
       .set("Authorization", `Bearer ${tokenA}`);
     expect(list.status).toBe(200);
     expect(list.body.length).toBe(0);
+  });
+
+  it("barcode produk terhapus bisa dipakai ulang", async () => {
+    const res = await request(app)
+      .post("/api/v1/products")
+      .set("Authorization", `Bearer ${tokenA}`)
+      .send({
+        name: "Indomie Baru",
+        barcode: "899001",
+        costPrice: 2600,
+        sellPrice: 3600,
+      });
+    expect(res.status).toBe(201);
+    expect(res.body.barcode).toBe("899001");
   });
 });

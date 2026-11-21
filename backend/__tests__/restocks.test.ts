@@ -30,6 +30,7 @@ async function applyMigration(file: string) {
 beforeAll(async () => {
   await applyMigration("001_init.sql");
   await applyMigration("002_products.sql");
+  await applyMigration("005_products_barcode_active.sql");
   await applyMigration("003_sales.sql");
   await applyMigration("004_restocks.sql");
   await getPool().query(

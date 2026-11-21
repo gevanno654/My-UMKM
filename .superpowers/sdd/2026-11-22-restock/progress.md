@@ -22,4 +22,13 @@ lagi di-POST buta yang berujung 404 generik. Tambah 2 test notifier.
 Suite: flutter test 124/124, analyze bersih; backend npm test 29/29,
 typecheck bersih. Commit 2da14e6.
 
+Task 4d (fix uji HP 21 Nov, barcode): pesan "Barcode sudah dipakai" ternyata
+bukan bentrok antar produk aktif — melainkan barcode produk Minion yang sudah
+DIHAPUS (soft-delete) memblokir pakai ulang karena unique index lama tidak
+mengecualikan baris terhapus. Migrasi 005: index parsial hanya baris aktif +
+null-kan barcode baris terhapus yang duplikat dengan produk aktif (bukan
+DELETE, agar FK riwayat utuh). Tambah 1 backend test. Sampingan: orkestrasi
+test backend dibuat sekuensial (flaky race TRUNCATE antar file). Suite:
+backend npm test 30/30, typecheck bersih.
+
 Final review: belum (menunggu eksekusi Task 5 / uji HP).
