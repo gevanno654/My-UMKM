@@ -42,6 +42,12 @@ class HomePlaceholder extends ConsumerWidget {
             ),
             const SizedBox(height: 8),
             ElevatedButton(
+              key: const Key('restockButton'),
+              onPressed: () => context.push('/restocks'),
+              child: const Text('Restock'),
+            ),
+            const SizedBox(height: 8),
+            ElevatedButton(
               key: const Key('productsButton'),
               onPressed: () => context.push('/products'),
               child: const Text('Kelola Produk'),

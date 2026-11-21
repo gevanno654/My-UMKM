@@ -143,9 +143,12 @@ void main() {
       '/sales/pay',
       '/sales/receipt',
       '/sales/history',
+      '/restocks',
+      '/restocks/new',
+      '/restocks/:id',
     ];
 
-    test('memetakan 15 route', () {
+    test('memetakan 18 route', () {
       expect(appRoutePaths, unorderedEquals(expectedPaths));
     });
 
