@@ -16,4 +16,10 @@ via onChanged + guard didUpdateWidget; tambah 3 widget test. Harga batch/FIFO
 diputuskan jadi milestone v2 (bukan v1). Tests: flutter test 122/122,
 analyze bersih.
 
+Task 4c (fix uji HP 21 Nov, sinkron): `_pushMissingProducts` mengembalikan
+pesan error bila produk gagal push (mis. 409 barcode bentrok) — restock tidak
+lagi di-POST buta yang berujung 404 generik. Tambah 2 test notifier.
+Suite: flutter test 124/124, analyze bersih; backend npm test 29/29,
+typecheck bersih. Commit 2da14e6.
+
 Final review: belum (menunggu eksekusi Task 5 / uji HP).
