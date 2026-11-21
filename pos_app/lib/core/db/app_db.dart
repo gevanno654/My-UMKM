@@ -55,7 +55,63 @@ class Products extends Table {
   ];
 }
 
-@DriftDatabase(tables: [LocalStores, LocalUsers, Products])
+/// Transaksi penjualan (offline-first, sumber utama HP).
+///
+/// - `number`: nomor struk `<INISIAL><DDMMYYYY><NNNN>`, unik per
+///   `(storeId, number)` — server menegakkan hal yang sama.
+/// - Harga tercatat snapshot di [SaleItems]; edit harga produk tidak
+///   mengubah riwayat.
+/// - `status`: 'ok' | 'voided'; void butuh `voidReason`.
+class Sales extends Table {
+  TextColumn get id => text()();
+  TextColumn get storeId => text()();
+  TextColumn get number => text()();
+  IntColumn get total => integer()();
+  IntColumn get paid => integer()();
+  IntColumn get change => integer().withDefault(const Constant(0))();
+  TextColumn get method => text()();
+  TextColumn get status => text().withDefault(const Constant('ok'))();
+  TextColumn get voidReason => text().nullable()();
+  IntColumn get createdAt => integer()();
+  IntColumn get updatedAt => integer().nullable()();
+  IntColumn get voidedAt => integer().nullable()();
+  IntColumn get dirty => integer().withDefault(const Constant(1))();
+
+  @override
+  Set<Column> get primaryKey => {id};
+
+  @override
+  List<Set<Column>> get uniqueKeys => [
+    {storeId, number},
+  ];
+}
+
+/// Baris item transaksi: snapshot nama + harga saat jual.
+class SaleItems extends Table {
+  TextColumn get id => text()();
+  TextColumn get saleId => text()();
+  TextColumn get productId => text().nullable()();
+  TextColumn get name => text()();
+  IntColumn get price => integer()();
+  IntColumn get qty => integer()();
+  IntColumn get subtotal => integer()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// Keranjang belanja persist (tahan pindah layar + restart HP).
+/// Satu baris per (storeId, productId).
+class CartLines extends Table {
+  TextColumn get storeId => text()();
+  TextColumn get productId => text()();
+  IntColumn get qty => integer()();
+
+  @override
+  Set<Column> get primaryKey => {storeId, productId};
+}
+
+@DriftDatabase(tables: [LocalStores, LocalUsers, Products, Sales, SaleItems, CartLines])
 class AppDb extends _$AppDb {
   AppDb(super.executor);
 
@@ -67,7 +123,7 @@ class AppDb extends _$AppDb {
   static AppDb openMemory() => AppDb(openMemoryDb());
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -78,6 +134,12 @@ class AppDb extends _$AppDb {
       // v1 → v2: tambah tabel products (data auth dipertahankan).
       if (from == 1) {
         await m.createTable(products);
+      }
+      // v2 → v3: tambah tabel kasir (sales, sale_items, cart_lines).
+      if (from <= 2) {
+        await m.createTable(sales);
+        await m.createTable(saleItems);
+        await m.createTable(cartLines);
       }
     },
   );
@@ -192,6 +254,163 @@ class AppDb extends _$AppDb {
             )
             ..orderBy([(t) => OrderingTerm.asc(t.updatedAt)]))
           .get();
+
+  // ------------------------------------------------------------------
+  // Kasir (checkout atomik, void beraudit, keranjang persist, sinkron).
+  // ------------------------------------------------------------------
+
+  /// Checkout atomik: insert sale + items, decrement stok tiap produk.
+  /// Throw [StateError] bila stok kurang (tidak ada yang berubah).
+  Future<void> checkoutSale({
+    required SalesCompanion sale,
+    required List<SaleItemsCompanion> items,
+  }) {
+    return transaction(() async {
+      for (final item in items) {
+        final productId = item.productId.value;
+        if (productId == null) continue; // item manual tanpa produk
+        final product = await getProduct(productId);
+        final qty = item.qty.value;
+        if (product == null || product.stock < qty) {
+          throw StateError('insufficient stock');
+        }
+        await (update(products)..where((t) => t.id.equals(productId))).write(
+          ProductsCompanion(
+            stock: Value(product.stock - qty),
+            updatedAt: Value(DateTime.now().toUtc().millisecondsSinceEpoch),
+            dirty: const Value(1),
+          ),
+        );
+      }
+      await into(sales).insert(sale.copyWith(dirty: const Value(1)));
+      for (final item in items) {
+        await into(saleItems).insert(item);
+      }
+    });
+  }
+
+  Future<Sale?> getSale(String id) =>
+      (select(sales)..where((t) => t.id.equals(id))).getSingleOrNull();
+
+  /// Riwayat transaksi toko, terbaru dulu.
+  Future<List<Sale>> salesHistory(String storeId) =>
+      (select(sales)
+            ..where((t) => t.storeId.equals(storeId))
+            ..orderBy([(t) => OrderingTerm.desc(t.createdAt)]))
+          .get();
+
+  Future<List<SaleItem>> saleItemsOf(String saleId) =>
+      (select(saleItems)..where((t) => t.saleId.equals(saleId))).get();
+
+  /// Void beraudit: status → voided + alasan wajib, stok dikembalikan.
+  /// Throw [ArgumentError] bila alasan kosong.
+  Future<void> voidSale({
+    required String id,
+    required String reason,
+    required int nowMillis,
+  }) {
+    if (reason.trim().isEmpty) {
+      throw ArgumentError('Alasan void wajib diisi');
+    }
+    return transaction(() async {
+      await (update(sales)..where((t) => t.id.equals(id))).write(
+        SalesCompanion(
+          status: const Value('voided'),
+          voidReason: Value(reason.trim()),
+          voidedAt: Value(nowMillis),
+          updatedAt: Value(nowMillis),
+          dirty: const Value(1),
+        ),
+      );
+      final items = await saleItemsOf(id);
+      for (final item in items) {
+        final productId = item.productId;
+        if (productId == null) continue;
+        final product = await getProduct(productId);
+        if (product == null) continue; // produk terhapus: stok tak kembali
+        await (update(products)..where((t) => t.id.equals(productId))).write(
+          ProductsCompanion(
+            stock: Value(product.stock + item.qty),
+            updatedAt: Value(nowMillis),
+            dirty: const Value(1),
+          ),
+        );
+      }
+    });
+  }
+
+  /// Urutan berikutnya untuk nomor struk pada tanggal `datePrefix`
+  /// (format DDMMYYYY): hitung nomor bernomor tsb + 1 (reset harian).
+  Future<int> nextReceiptSeq(String storeId, String datePrefix) async {
+    final rows = await (select(sales)
+          ..where(
+            (t) =>
+                t.storeId.equals(storeId) &
+                t.number.like('%-$datePrefix-%') |
+                t.storeId.equals(storeId) & t.number.like('%$datePrefix%'),
+          ))
+        .get();
+    final pattern = RegExp(RegExp.escape(datePrefix) + r'(\d+)$');
+    var max = 0;
+    for (final row in rows) {
+      final m = pattern.firstMatch(row.number);
+      if (m != null) {
+        final seq = int.tryParse(m.group(1)!) ?? 0;
+        if (seq > max) max = seq;
+      }
+    }
+    return max + 1;
+  }
+
+  /// Tandai sale sudah tersinkron (push sukses).
+  Future<void> markSalesClean(List<String> ids) =>
+      (update(sales)..where((t) => t.id.isIn(ids))).write(
+        const SalesCompanion(dirty: Value(0)),
+      );
+
+  /// Sale kotor milik toko (belum ter-push ke server).
+  Future<List<Sale>> dirtySales(String storeId) =>
+      (select(sales)
+            ..where((t) => t.storeId.equals(storeId) & t.dirty.equals(1))
+            ..orderBy([(t) => OrderingTerm.asc(t.createdAt)]))
+          .get();
+
+  /// Upsert sale dari server (pull): baris server selalu bersih.
+  /// Status voided server menang atas ok lokal.
+  Future<void> upsertSaleFromServer(SalesCompanion entry) =>
+      into(sales).insertOnConflictUpdate(
+        entry.copyWith(dirty: const Value(0)),
+      );
+
+  Future<void> replaceSaleItems(
+    String saleId,
+    List<SaleItemsCompanion> items,
+  ) {
+    return transaction(() async {
+      await (delete(saleItems)..where((t) => t.saleId.equals(saleId))).go();
+      for (final item in items) {
+        await into(saleItems).insert(item);
+      }
+    });
+  }
+
+  // -- Keranjang persist --
+
+  Future<List<CartLine>> getCartLines(String storeId) =>
+      (select(cartLines)..where((t) => t.storeId.equals(storeId))).get();
+
+  Future<void> upsertCartLine(CartLinesCompanion entry) =>
+      into(cartLines).insertOnConflictUpdate(entry);
+
+  Future<void> removeCartLine(String storeId, String productId) =>
+      (delete(cartLines)..where(
+            (t) =>
+                t.storeId.equals(storeId) & t.productId.equals(productId),
+          ))
+          .go();
+
+  Future<void> clearCart(String storeId) =>
+      (delete(cartLines)..where((t) => t.storeId.equals(storeId))).go();
 }
 
 /// Barcode ''/blank → NULL (kolom nullable, bukan Value.absent).
