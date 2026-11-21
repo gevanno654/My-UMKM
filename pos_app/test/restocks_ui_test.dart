@@ -110,7 +110,8 @@ void main() {
       expect(find.textContaining('2.500'), findsWidgets);
     });
 
-    testWidgets('centang ubah jual -> field jual muncul', (tester) async {
+    testWidgets('opsi ubah harga jual tidak tampil (ditunda ke v2)',
+        (tester) async {
       final container = await makeRestock(tester);
       await pumpRestocks(tester, container);
       await openDraft(tester);
@@ -125,13 +126,78 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 500));
 
-      await tester.ensureVisible(find.byKey(const Key('updateSell-p1')));
+      expect(find.byKey(const Key('updateSell-p1')), findsNothing);
+      expect(find.byKey(const Key('sellPriceField-p1')), findsNothing);
+    });
+
+    testWidgets('ubah harga beli -> total modal berubah live', (tester) async {
+      final container = await makeRestock(tester);
+      await pumpRestocks(tester, container);
+      await openDraft(tester);
+
+      await tester.enterText(
+        find.byKey(const Key('restockSearchField')),
+        'Indo',
+      );
       await tester.pump();
-      await tester.tap(find.byKey(const Key('updateSell-p1')));
+      await tester.pump(const Duration(milliseconds: 500));
+      await tester.tap(find.text('Indomie').first);
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 500));
 
-      expect(find.byKey(const Key('sellPriceField-p1')), findsOneWidget);
+      await tester.ensureVisible(find.byKey(const Key('costPriceField-p1')));
+      await tester.pump();
+      await tester.enterText(
+        find.byKey(const Key('costPriceField-p1')),
+        '2600',
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+
+      expect(find.textContaining('2.600'), findsWidgets);
+    });
+
+    testWidgets('ubah harga beli lalu simpan -> katalog ikut harga baru',
+        (tester) async {
+      final container = await makeRestock(tester);
+      await pumpRestocks(tester, container);
+      await openDraft(tester);
+
+      await tester.enterText(
+        find.byKey(const Key('restockSearchField')),
+        'Indo',
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+      await tester.tap(find.text('Indomie').first);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+
+      await tester.ensureVisible(find.byKey(const Key('costPriceField-p1')));
+      await tester.pump();
+      await tester.enterText(
+        find.byKey(const Key('costPriceField-p1')),
+        '2600',
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+
+      await tester.tap(find.byKey(const Key('saveRestockButton')));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+      await tester.runAsync(() async {
+        await Future<void>.delayed(const Duration(milliseconds: 500));
+      });
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+
+      // Riwayat pakai harga baru (1 x 2600), bukan harga lama 2500.
+      expect(find.textContaining('2.600'), findsWidgets);
+      await tester.runAsync(() async {
+        final p =
+            await container.read(appDbProvider).getProduct('p1');
+        expect(p!.costPrice, 2600);
+      });
     });
 
     testWidgets('tombol scan tersedia di draft', (tester) async {

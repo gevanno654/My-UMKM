@@ -65,35 +65,29 @@ class RestockItemModel {
 enum SyncStatus { idle, syncing, offline, error }
 
 /// Satu baris draft kulakan di memori (belum disimpan).
+/// v1: qty + harga beli saja. Opsi ubah harga jual dihapus sementara
+/// (harga jual diubah via Kelola Produk); batch/FIFO direncanakan v2.
 class RestockDraftLine {
   const RestockDraftLine({
     required this.productId,
     required this.qty,
     required this.costPrice,
-    this.updateSell = false,
-    this.sellPrice,
   });
 
   final String productId;
   final int qty;
   final int costPrice;
-  final bool updateSell;
-  final int? sellPrice;
 
   int get subtotal => qty * costPrice;
 
   RestockDraftLine copyWith({
     int? qty,
     int? costPrice,
-    bool? updateSell,
-    int? Function()? sellPrice,
   }) =>
       RestockDraftLine(
         productId: productId,
         qty: qty ?? this.qty,
         costPrice: costPrice ?? this.costPrice,
-        updateSell: updateSell ?? this.updateSell,
-        sellPrice: sellPrice == null ? this.sellPrice : sellPrice(),
       );
 }
 
@@ -206,28 +200,20 @@ class RestocksNotifier extends Notifier<RestocksState> {
     return null;
   }
 
-  /// Ubah harga beli / opsi harga jual baris draft.
+  /// Ubah harga beli baris draft. Dipanggil live dari UI (`onChanged`),
+  /// jadi nilai selalu masuk state walau user tidak menekan enter.
   Future<String?> setDraftPrices(
     String productId, {
     int? costPrice,
-    bool? updateSell,
-    int? Function()? sellPrice,
   }) async {
     if (costPrice != null && (costPrice < 0 || costPrice > 999999999)) {
       return 'Harga beli harus angka 0..999999999';
     }
-    final sell = sellPrice == null ? null : sellPrice();
-    if (sell != null && (sell < 0 || sell > 999999999)) {
-      return 'Harga jual harus angka 0..999999999';
-    }
-    // Harga jual baru di bawah harga beli baru: diizinkan tanpa peringatan.
     final existing = _lineOf(productId);
     if (existing == null) return 'Baris tidak ada di draft';
     final lines = List<RestockDraftLine>.from(state.draftLines);
     lines[lines.indexOf(existing)] = existing.copyWith(
       costPrice: costPrice,
-      updateSell: updateSell,
-      sellPrice: sellPrice,
     );
     _setDraft(lines);
     state = state.copyWith(lastError: () => null);
@@ -272,14 +258,6 @@ class RestocksNotifier extends Notifier<RestocksState> {
         state = state.copyWith(lastError: () => msg);
         return msg;
       }
-      if (line.updateSell &&
-          (line.sellPrice == null ||
-              line.sellPrice! < 0 ||
-              line.sellPrice! > 999999999)) {
-        const msg = 'Harga jual harus angka 0..999999999';
-        state = state.copyWith(lastError: () => msg);
-        return msg;
-      }
     }
     final restockId = _uuid.v4();
     final now = DateTime.now().toUtc().millisecondsSinceEpoch;
@@ -297,7 +275,7 @@ class RestocksNotifier extends Notifier<RestocksState> {
           name: product.name,
           qty: line.qty,
           costPrice: line.costPrice,
-          sellPrice: Value(line.updateSell ? line.sellPrice : null),
+          sellPrice: const Value.absent(),
           subtotal: subtotal,
         ),
       );

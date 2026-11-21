@@ -295,7 +295,7 @@ class _RestockDraftScreenState extends ConsumerState<RestockDraftScreen> {
   }
 }
 
-/// Satu baris draft: nama + stepper qty + harga beli + checkbox jual + hapus.
+/// Satu baris draft: nama + stepper qty + harga beli + hapus.
 class _DraftRow extends ConsumerStatefulWidget {
   const _DraftRow({required this.line});
 
@@ -307,30 +307,25 @@ class _DraftRow extends ConsumerStatefulWidget {
 
 class _DraftRowState extends ConsumerState<_DraftRow> {
   late final TextEditingController _cost;
-  late final TextEditingController _sell;
 
   @override
   void initState() {
     super.initState();
     _cost = TextEditingController(text: '${widget.line.costPrice}');
-    _sell = TextEditingController(text: '${widget.line.sellPrice ?? 0}');
   }
 
   @override
   void didUpdateWidget(covariant _DraftRow oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.line.costPrice != widget.line.costPrice) {
+    if (oldWidget.line.costPrice != widget.line.costPrice &&
+        _cost.text != '${widget.line.costPrice}') {
       _cost.text = '${widget.line.costPrice}';
-    }
-    if (oldWidget.line.sellPrice != widget.line.sellPrice) {
-      _sell.text = '${widget.line.sellPrice ?? 0}';
     }
   }
 
   @override
   void dispose() {
     _cost.dispose();
-    _sell.dispose();
     super.dispose();
   }
 
@@ -394,51 +389,18 @@ class _DraftRowState extends ConsumerState<_DraftRow> {
                           labelText: 'Harga beli',
                           border: OutlineInputBorder(),
                         ),
-                        onSubmitted: (v) => ref
+                        onChanged: (v) => ref
                             .read(restocksProvider.notifier)
                             .setDraftPrices(
                               line.productId,
-                              costPrice: int.tryParse(v.trim()) ?? -1,
+                              costPrice: v.trim().isEmpty
+                                  ? 0
+                                  : int.tryParse(v.trim()) ?? -1,
                             ),
                       ),
                     ),
                   ],
                 ),
-                Row(
-                  children: [
-                    Checkbox(
-                      key: Key('updateSell-${line.productId}'),
-                      value: line.updateSell,
-                      onChanged: (v) => ref
-                          .read(restocksProvider.notifier)
-                          .setDraftPrices(
-                            line.productId,
-                            updateSell: v ?? false,
-                            sellPrice: v == true
-                                ? () => int.tryParse(_sell.text.trim()) ?? 0
-                                : () => null,
-                          ),
-                    ),
-                    const Text('Ubah harga jual'),
-                  ],
-                ),
-                if (line.updateSell)
-                  TextField(
-                    key: Key('sellPriceField-${line.productId}'),
-                    controller: _sell,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                      labelText: 'Harga jual baru',
-                      border: OutlineInputBorder(),
-                    ),
-                    onSubmitted: (v) => ref
-                        .read(restocksProvider.notifier)
-                        .setDraftPrices(
-                          line.productId,
-                          updateSell: true,
-                          sellPrice: () => int.tryParse(v.trim()),
-                        ),
-                  ),
               ],
             ),
           ),

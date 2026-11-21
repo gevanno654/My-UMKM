@@ -152,15 +152,10 @@ void main() {
   });
 
   group('simpan', () {
-    test('save -> stok bertambah + draft kosong + riwayat ada', () async {
+    test('save -> stok + harga beli katalog update, jual tetap', () async {
       final env = await makeRestocks();
       await env.notifier.addToDraft('p1', qty: 2);
-      await env.notifier.setDraftPrices(
-        'p1',
-        costPrice: 2600,
-        updateSell: true,
-        sellPrice: () => 3600,
-      );
+      await env.notifier.setDraftPrices('p1', costPrice: 2600);
 
       final err = await env.notifier.saveRestock();
 
@@ -168,7 +163,8 @@ void main() {
       expect(env.notifier.state.draftLines, isEmpty);
       expect((await env.db.getProduct('p1'))!.stock, 12);
       expect((await env.db.getProduct('p1'))!.costPrice, 2600);
-      expect((await env.db.getProduct('p1'))!.sellPrice, 3600);
+      // Harga jual katalog tidak berubah lewat restock v1.
+      expect((await env.db.getProduct('p1'))!.sellPrice, 3500);
       expect(env.notifier.state.history.length, 1);
       expect(env.notifier.state.history.first.total, 5200);
     });
