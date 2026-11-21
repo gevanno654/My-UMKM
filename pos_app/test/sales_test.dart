@@ -260,11 +260,11 @@ void main() {
 
   group('sinkron manual', () {
     test('sale berisi produk belum di server -> push katalog dulu lalu retry', () async {
-      // Root cause HP: checkout memakai produk baru (belum sync produk),
-      // POST /sales 404 'product not found'. Perilaku benar: push produk
-      // terkait yang masih dirty, lalu ulangi POST sale sekali.
+      // Sinkron kasir sekaligus sinkron produk (stok): produk terkait
+      // dirty sales selalu di-push DULU, baru sale di-POST sekali.
       var productPushed = false;
       var saleAttempts = 0;
+      final events = <String>[];
       final env = await makeSales(
         apiHandler: (options) async {
           if (options.method == 'PUT') {
@@ -273,6 +273,7 @@ void main() {
           if (options.method == 'POST' &&
               options.path.endsWith('/products')) {
             productPushed = true;
+            events.add('product');
             return ok(options, {
               'id': 'p3',
               'name': 'Kopi',
@@ -288,6 +289,7 @@ void main() {
           }
           if (options.method == 'POST' && options.path.endsWith('/sales')) {
             saleAttempts++;
+            events.add('sale');
             if (!productPushed) {
               return fail(options, 404, {'error': 'product not found'});
             }
@@ -315,7 +317,9 @@ void main() {
       await env.notifier.syncNow(accessToken: 'token');
 
       expect(productPushed, isTrue);
-      expect(saleAttempts, 2);
+      expect(saleAttempts, 1);
+      // Urutan deterministik: produk dulu, baru sale.
+      expect(events, ['product', 'sale']);
       expect(env.notifier.state.syncStatus, sales.SyncStatus.idle);
       expect(env.notifier.state.lastError, isNull);
     });
@@ -323,6 +327,21 @@ void main() {
     test('push sale kotor -> bersih + pull server masuk', () async {
       final env = await makeSales(
         apiHandler: (options) async {
+          // Produk p1 sudah ada di server: PUT sukses (return katalog).
+          if (options.method == 'PUT') {
+            return ok(options, {
+              'id': 'p1',
+              'name': 'Indomie',
+              'barcode': null,
+              'costPrice': 2500,
+              'sellPrice': 3500,
+              'stock': 3,
+              'category': '',
+              'photoPath': '',
+              'updatedAt': '2026-01-01T00:00:00.000Z',
+              'deletedAt': null,
+            });
+          }
           if (options.method == 'POST') {
             return ok(options, saleJson(), 201);
           }
@@ -346,6 +365,20 @@ void main() {
 
     test('nomor duplikat 409 -> pesan buat ulang', () async {      final env = await makeSales(
         apiHandler: (options) async {
+          if (options.method == 'PUT') {
+            return ok(options, {
+              'id': 'p1',
+              'name': 'Indomie',
+              'barcode': null,
+              'costPrice': 2500,
+              'sellPrice': 3500,
+              'stock': 4,
+              'category': '',
+              'photoPath': '',
+              'updatedAt': '2026-01-01T00:00:00.000Z',
+              'deletedAt': null,
+            });
+          }
           if (options.method == 'POST') {
             return fail(options, 409, {'error': 'number taken'});
           }

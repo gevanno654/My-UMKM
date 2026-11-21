@@ -266,27 +266,14 @@ class SalesNotifier extends Notifier<SalesState> {
     final dirty = await _db.dirtySales(_storeId);
     for (final row in dirty) {
       try {
+        // Sinkron kasir sekaligus sinkron produk: produk terkait di-push
+        // DULU (stok cloud ikut terkini), baru sale di-POST sekali.
+        await _pushMissingProducts(accessToken, row.id);
         await _postSale(accessToken, row);
         await _db.markSalesClean([row.id]);
       } on DioException catch (e) {
         if (e.response?.statusCode == 409) {
           onRowError(SalesApi.friendlyError(e));
-          continue;
-        }
-        // Produk di sale belum ada di server (dibuat setelah backup /
-        // belum sync produk): push katalog terkait dulu, lalu ulangi sekali.
-        if (_isProductNotFound(e)) {
-          await _pushMissingProducts(accessToken, row.id);
-          try {
-            await _postSale(accessToken, row);
-          } on DioException catch (retryError) {
-            if (retryError.response?.statusCode == 409) {
-              onRowError(SalesApi.friendlyError(retryError));
-              continue;
-            }
-            rethrow;
-          }
-          await _db.markSalesClean([row.id]);
           continue;
         }
         rethrow;
@@ -315,13 +302,6 @@ class SalesNotifier extends Notifier<SalesState> {
       paid: row.paid,
       method: PayMethod.values.byName(row.method),
     );
-  }
-
-  /// 404 'product not found' dari POST /sales.
-  bool _isProductNotFound(DioException e) {
-    if (e.response?.statusCode != 404) return false;
-    final data = e.response?.data;
-    return data is Map && data['error'] == 'product not found';
   }
 
   /// Push produk-produk dalam sale yang masih dirty (belum ada di server),
