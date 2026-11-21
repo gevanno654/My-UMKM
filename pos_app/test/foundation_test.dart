@@ -139,9 +139,13 @@ void main() {
       '/products/scan',
       '/products/:id',
       '/products/:id/edit',
+      '/sales',
+      '/sales/pay',
+      '/sales/receipt',
+      '/sales/history',
     ];
 
-    test('memetakan 11 route', () {
+    test('memetakan 15 route', () {
       expect(appRoutePaths, unorderedEquals(expectedPaths));
     });
 
@@ -205,7 +209,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('Kasir segera hadir'), findsOneWidget);
+      expect(find.textContaining('Halo,'), findsOneWidget);
     });
 
     testWidgets('logout otomatis redirect ke /login tanpa navigasi manual', (
@@ -247,7 +251,7 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      expect(find.textContaining('Kasir segera hadir'), findsOneWidget);
+      expect(find.textContaining('Halo,'), findsOneWidget);
 
       await tester.runAsync(() async {
         await container.read(authProvider.notifier).logout();
@@ -255,7 +259,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Masuk'), findsWidgets);
-      expect(find.textContaining('Kasir segera hadir'), findsNothing);
+      expect(find.textContaining('Halo,'), findsNothing);
     });
   });
 }

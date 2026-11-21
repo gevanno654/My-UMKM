@@ -33,8 +33,14 @@ class HomePlaceholder extends ConsumerWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text('Halo, $name! Kasir segera hadir.'),
+            Text('Halo, $name!'),
             const SizedBox(height: 12),
+            ElevatedButton(
+              key: const Key('kasirButton'),
+              onPressed: () => context.push('/sales'),
+              child: const Text('Kasir'),
+            ),
+            const SizedBox(height: 8),
             ElevatedButton(
               key: const Key('productsButton'),
               onPressed: () => context.push('/products'),

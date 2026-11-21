@@ -12,6 +12,7 @@ import '../features/products/product_form_screen.dart';
 import '../features/products/product_model.dart';
 import '../features/products/products_screens.dart';
 import '../features/products/scan_screen.dart';
+import '../features/sales/sales_screens.dart';
 
 /// Semua route fondasi + produk.
 const appRoutePaths = <String>[
@@ -26,6 +27,10 @@ const appRoutePaths = <String>[
   '/products/scan',
   '/products/:id',
   '/products/:id/edit',
+  '/sales',
+  '/sales/pay',
+  '/sales/receipt',
+  '/sales/history',
 ];
 
 /// Aturan gate auth murni (tanpa I/O) agar mudah diuji:
@@ -124,6 +129,22 @@ GoRouter buildRouter({
         builder: (context, state) => ProductFormScreen(
           product: state.extra as ProductModel?,
         ),
+      ),
+      GoRoute(
+        path: '/sales',
+        builder: (context, state) => const KasirScreen(),
+      ),
+      GoRoute(
+        path: '/sales/pay',
+        builder: (context, state) => const PayScreen(),
+      ),
+      GoRoute(
+        path: '/sales/receipt',
+        builder: (context, state) => const ReceiptScreen(),
+      ),
+      GoRoute(
+        path: '/sales/history',
+        builder: (context, state) => const HistoryScreen(),
       ),
     ],
   );
