@@ -228,8 +228,8 @@ class ProductsNotifier extends Notifier<ProductsState> {
     );
     String? firstError;
     try {
-      await _push(accessToken, (e) => firstError ??= e);
-      await _pull(accessToken);
+      await pushCatalog(accessToken, (e) => firstError ??= e);
+      await pullCatalog(accessToken);
       state = state.copyWith(
         syncStatus: firstError == null ? SyncStatus.idle : SyncStatus.error,
         lastError: () => firstError,
@@ -252,7 +252,7 @@ class ProductsNotifier extends Notifier<ProductsState> {
     }
   }
 
-  Future<void> _push(
+  Future<void> pushCatalog(
     String accessToken,
     void Function(String) onRowError,
   ) async {
@@ -288,7 +288,7 @@ class ProductsNotifier extends Notifier<ProductsState> {
     }
   }
 
-  Future<void> _pull(String accessToken) async {
+  Future<void> pullCatalog(String accessToken) async {
     final server = await _api.list(accessToken, _storeId);
     for (final s in server) {
       final local = await _db.getProduct(s.id);

@@ -235,8 +235,8 @@ class SalesNotifier extends Notifier<SalesState> {
     state = state.copyWith(syncStatus: SyncStatus.syncing, lastError: () => null);
     String? firstError;
     try {
-      await _push(accessToken, (e) => firstError ??= e);
-      await _pull(accessToken);
+      await pushSales(accessToken, (e) => firstError ??= e);
+      await pullSales(accessToken);
       state = state.copyWith(
         syncStatus: firstError == null ? SyncStatus.idle : SyncStatus.error,
         lastError: () => firstError,
@@ -259,7 +259,7 @@ class SalesNotifier extends Notifier<SalesState> {
     }
   }
 
-  Future<void> _push(
+  Future<void> pushSales(
     String accessToken,
     void Function(String) onRowError,
   ) async {
@@ -347,7 +347,7 @@ class SalesNotifier extends Notifier<SalesState> {
     }
   }
 
-  Future<void> _pull(String accessToken) async {
+  Future<void> pullSales(String accessToken) async {
     final server = await _api.list(accessToken);
     for (final s in server) {
       final local = await _db.getSale(s.id);

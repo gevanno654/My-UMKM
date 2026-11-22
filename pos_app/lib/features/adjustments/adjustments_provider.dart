@@ -210,8 +210,8 @@ class AdjustmentsNotifier extends Notifier<AdjustmentsState> {
     );
     String? firstError;
     try {
-      await _push(accessToken, (e) => firstError ??= e);
-      await _pull(accessToken);
+      await pushAdjustments(accessToken, (e) => firstError ??= e);
+      await pullAdjustments(accessToken);
       state = state.copyWith(
         syncStatus: firstError == null ? SyncStatus.idle : SyncStatus.error,
         lastError: () => firstError,
@@ -234,7 +234,7 @@ class AdjustmentsNotifier extends Notifier<AdjustmentsState> {
     }
   }
 
-  Future<void> _push(
+  Future<void> pushAdjustments(
     String accessToken,
     void Function(String) onRowError,
   ) async {
@@ -323,7 +323,7 @@ class AdjustmentsNotifier extends Notifier<AdjustmentsState> {
     return null;
   }
 
-  Future<void> _pull(String accessToken) async {
+  Future<void> pullAdjustments(String accessToken) async {
     final server = await _api.list(accessToken);
     for (final s in server) {
       final local = await _db.getAdjustment(s.id);

@@ -341,8 +341,8 @@ class RestocksNotifier extends Notifier<RestocksState> {
     );
     String? firstError;
     try {
-      await _push(accessToken, (e) => firstError ??= e);
-      await _pull(accessToken);
+      await pushRestocks(accessToken, (e) => firstError ??= e);
+      await pullRestocks(accessToken);
       state = state.copyWith(
         syncStatus: firstError == null ? SyncStatus.idle : SyncStatus.error,
         lastError: () => firstError,
@@ -365,7 +365,7 @@ class RestocksNotifier extends Notifier<RestocksState> {
     }
   }
 
-  Future<void> _push(
+  Future<void> pushRestocks(
     String accessToken,
     void Function(String) onRowError,
   ) async {
@@ -470,7 +470,7 @@ class RestocksNotifier extends Notifier<RestocksState> {
     return null;
   }
 
-  Future<void> _pull(String accessToken) async {
+  Future<void> pullRestocks(String accessToken) async {
     final server = await _api.list(accessToken);
     for (final s in server) {
       final local = await _db.getRestock(s.id);
