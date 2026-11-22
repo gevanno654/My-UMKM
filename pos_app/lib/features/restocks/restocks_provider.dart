@@ -372,6 +372,26 @@ class RestocksNotifier extends Notifier<RestocksState> {
     final dirty = await _db.dirtyRestocks(_storeId);
     for (final row in dirty) {
       try {
+        // Baris voided: kirim pembatalan ke server, bukan POST ulang dokumen.
+        // 404 (restock belum pernah terkirim) = anggap sukses; 409 stok
+        // kurang di server = pesan jelas.
+        if (row.status == 'voided') {
+          try {
+            await _api.voidRestock(
+              accessToken: accessToken,
+              id: row.id,
+              reason: row.voidReason ?? 'dibatalkan',
+            );
+          } on DioException catch (e) {
+            if (e.response?.statusCode == 404) {
+              // Belum pernah terkirim: tidak ada yang perlu dibatalkan.
+            } else {
+              rethrow;
+            }
+          }
+          await _db.markRestocksClean([row.id]);
+          continue;
+        }
         // Sinkron restock sekaligus sinkron produk: produk terkait di-push
         // DULU (stok cloud ikut terkini), baru restock di-POST sekali.
         // Bila ada produk gagal push (mis. barcode bentrok), restock tidak

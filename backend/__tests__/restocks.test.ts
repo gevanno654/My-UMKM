@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import crypto from "node:crypto";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import request from "supertest";
@@ -71,7 +72,91 @@ afterAll(async () => {
 });
 
 describe("POST /api/v1/restocks", () => {
+  it("restock id sama di-POST 2x (retry HP) -> 1 baris, stok +sekali", async () => {
+    const retryId = crypto.randomUUID();
+    const before = await getPool().query(
+      "SELECT stock FROM products WHERE id = $1",
+      [productIdA],
+    );
+    const base = before.rows[0].stock as number;
+
+    for (let i = 0; i < 2; i++) {
+      const res = await request(app)
+        .post("/api/v1/restocks")
+        .set("Authorization", `Bearer ${tokenA}`)
+        .send({
+          id: retryId,
+          items: [{ productId: productIdA, qty: 2, costPrice: 2600 }],
+        });
+      expect(res.status).toBe(201);
+      expect(res.body.id).toBe(retryId);
+    }
+
+    const after = await getPool().query(
+      "SELECT stock FROM products WHERE id = $1",
+      [productIdA],
+    );
+    expect(after.rows[0].stock).toBe(base + 2);
+    const count = await getPool().query(
+      "SELECT COUNT(*)::int c FROM restocks WHERE id = $1",
+      [retryId],
+    );
+    expect(count.rows[0].c).toBe(1);
+  });
+
+  it("retry id sama: cek-duplikat SEBELUM mutasi stok (bug: stok +2x)", async () => {
+    // Varian ketat dari test idempoten di atas: memastikan tidak ada window
+    // di mana stok termutasi sebelum cek duplikat. Kirim 2x paralel —
+    // keduanya lolos validasi produk sebelum salah satunya commit.
+    // Dengan cek-setelah-mutasi (kode saat ini), hasil bisa base+4.
+    const retryId = crypto.randomUUID();
+    const before = await getPool().query(
+      "SELECT stock FROM products WHERE id = $1",
+      [productIdA],
+    );
+    const base = before.rows[0].stock as number;
+
+    const [r1, r2] = await Promise.all([
+      request(app)
+        .post("/api/v1/restocks")
+        .set("Authorization", `Bearer ${tokenA}`)
+        .send({
+          id: retryId,
+          items: [{ productId: productIdA, qty: 2, costPrice: 2600 }],
+        }),
+      request(app)
+        .post("/api/v1/restocks")
+        .set("Authorization", `Bearer ${tokenA}`)
+        .send({
+          id: retryId,
+          items: [{ productId: productIdA, qty: 2, costPrice: 2600 }],
+        }),
+    ]);
+    // Keduanya 201 (idempoten), salah satu 201 + satu 201-duplikat.
+    expect([r1.status, r2.status]).toEqual([201, 201]);
+
+    const after = await getPool().query(
+      "SELECT stock FROM products WHERE id = $1",
+      [productIdA],
+    );
+    // RED: kode saat ini update stok DULU baru cek duplikat -> base+4.
+    expect(after.rows[0].stock).toBe(base + 2);
+    const count = await getPool().query(
+      "SELECT COUNT(*)::int c FROM restocks WHERE id = $1",
+      [retryId],
+    );
+    expect(count.rows[0].c).toBe(1);
+  });
+
   it("valid 2 item -> 201, stok bertambah, harga katalog update", async () => {
+    const baseA = await getPool().query(
+      "SELECT stock FROM products WHERE id = $1",
+      [productIdA],
+    );
+    const baseB = await getPool().query(
+      "SELECT stock FROM products WHERE id = $1",
+      [productIdB],
+    );
     const res = await request(app)
       .post("/api/v1/restocks")
       .set("Authorization", `Bearer ${tokenA}`)
@@ -90,7 +175,9 @@ describe("POST /api/v1/restocks", () => {
       "SELECT stock, cost_price, sell_price FROM products WHERE id = $1",
       [productIdA],
     );
-    expect(prod.rows[0].stock).toBe(15);
+    expect(prod.rows[0].stock).toBe(
+      (baseA.rows[0].stock as number) + 5,
+    );
     expect(prod.rows[0].cost_price).toBe(2600);
     expect(prod.rows[0].sell_price).toBe(3600);
 
@@ -98,7 +185,7 @@ describe("POST /api/v1/restocks", () => {
       "SELECT stock, cost_price, sell_price FROM products WHERE id = $1",
       [productIdB],
     );
-    expect(prod2.rows[0].stock).toBe(8);
+    expect(prod2.rows[0].stock).toBe((baseB.rows[0].stock as number) + 3);
     expect(prod2.rows[0].cost_price).toBe(2100);
     // Tanpa sellPrice: harga jual katalog tetap.
     expect(prod2.rows[0].sell_price).toBe(3000);
@@ -123,6 +210,11 @@ describe("POST /api/v1/restocks", () => {
 
 describe("POST /api/v1/restocks/:id/void", () => {
   it("void + alasan -> status voided, stok kembali", async () => {
+    const before = await getPool().query(
+      "SELECT stock FROM products WHERE id = $1",
+      [productIdA],
+    );
+    const base = before.rows[0].stock as number;
     const created = await request(app)
       .post("/api/v1/restocks")
       .set("Authorization", `Bearer ${tokenA}`)
@@ -141,8 +233,8 @@ describe("POST /api/v1/restocks/:id/void", () => {
       "SELECT stock FROM products WHERE id = $1",
       [productIdA],
     );
-    // 10 awal + 5 (test pertama) + 4 - 4 (void) = 15
-    expect(prod.rows[0].stock).toBe(15);
+    // +4 lalu -4 (void) = kembali ke dasar.
+    expect(prod.rows[0].stock).toBe(base);
   });
 
   it("void tanpa alasan -> 400", async () => {

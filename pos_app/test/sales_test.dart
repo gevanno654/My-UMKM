@@ -52,6 +52,7 @@ Map<String, dynamic> saleJson({
   int paid = 10000,
   int change = 3000,
   String method = 'tunai',
+  String status = 'ok',
 }) => {
   'id': id,
   'number': number,
@@ -59,7 +60,7 @@ Map<String, dynamic> saleJson({
   'paid': paid,
   'change': change,
   'method': method,
-  'status': 'ok',
+  'status': status,
   'voidReason': null,
   'createdAt': '2026-01-01T00:00:00.000Z',
   'items': [
@@ -396,6 +397,99 @@ void main() {
         contains('Nomor struk sudah dipakai'),
       );
     });
+
+    test(
+      'void lokal lalu sync -> POST /void terkirim, idle, bersih',
+      () async {
+        final events = <String>[];
+        final env = await makeSales(
+          apiHandler: (options) async {
+            if (options.method == 'PUT') {
+              return ok(options, {
+                'id': 'p1',
+                'name': 'Indomie',
+                'barcode': null,
+                'costPrice': 2500,
+                'sellPrice': 3500,
+                'stock': 4,
+                'category': '',
+                'photoPath': '',
+                'updatedAt': '2026-01-01T00:00:00.000Z',
+                'deletedAt': null,
+              });
+            }
+            if (options.path.endsWith('/void')) {
+              events.add('void');
+              return ok(options, saleJson(status: 'voided'));
+            }
+            if (options.method == 'POST' &&
+                options.path.endsWith('/sales')) {
+              events.add('sale');
+              return ok(options, saleJson(), 201);
+            }
+            return ok(options, []);
+          },
+        );
+        await env.notifier.addItem('p1', 2);
+        await env.notifier.checkout(paid: 7000, method: PayMethod.tunai);
+        final id = env.notifier.state.history.single.id;
+
+        await env.notifier.syncNow(accessToken: 'token');
+        expect(events, ['sale']);
+
+        await env.notifier.voidSale(id, 'salah input');
+        expect((await env.db.getProduct('p1'))!.stock, 5);
+
+        await env.notifier.syncNow(accessToken: 'token');
+
+        expect(events, ['sale', 'void']);
+        expect(env.notifier.state.syncStatus, sales.SyncStatus.idle);
+        expect(env.notifier.state.lastError, isNull);
+        expect(
+          env.notifier.state.history.singleWhere((e) => e.id == id).isVoided,
+          isTrue,
+        );
+      },
+    );
+
+    test(
+      'sale sync 2x: tidak di-POST ulang (anti stok-dobel)',
+      () async {
+        var salePosts = 0;
+        final env = await makeSales(
+          apiHandler: (options) async {
+            if (options.method == 'PUT') {
+              return ok(options, {
+                'id': 'p1',
+                'name': 'Indomie',
+                'barcode': null,
+                'costPrice': 2500,
+                'sellPrice': 3500,
+                'stock': 3,
+                'category': '',
+                'photoPath': '',
+                'updatedAt': '2026-01-01T00:00:00.000Z',
+                'deletedAt': null,
+              });
+            }
+            if (options.method == 'POST' &&
+                options.path.endsWith('/sales')) {
+              salePosts++;
+              return ok(options, saleJson(), 201);
+            }
+            return ok(options, []);
+          },
+        );
+        await env.notifier.addItem('p1', 2);
+        await env.notifier.checkout(paid: 7000, method: PayMethod.tunai);
+
+        await env.notifier.syncNow(accessToken: 'token');
+        await env.notifier.syncNow(accessToken: 'token');
+
+        expect(salePosts, 1);
+        expect(env.notifier.state.lastError, isNull);
+      },
+    );
   });
 }
 

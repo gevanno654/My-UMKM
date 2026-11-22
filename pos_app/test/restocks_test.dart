@@ -253,7 +253,19 @@ void main() {
       final env = await makeRestocks(
         apiHandler: (options) async {
           if (options.method == 'PUT') {
-            return fail(options, 404, {'error': 'not found'});
+            events.add('product');
+            return ok(options, {
+              'id': 'p1',
+              'name': 'Indomie',
+              'barcode': null,
+              'costPrice': 2600,
+              'sellPrice': 3500,
+              'stock': 12,
+              'category': '',
+              'photoPath': '',
+              'updatedAt': '2026-01-01T00:00:00.000Z',
+              'deletedAt': null,
+            });
           }
           if (options.method == 'POST' &&
               options.path.endsWith('/products')) {
@@ -288,7 +300,51 @@ void main() {
       expect(events, ['product', 'restock']);
       expect(env.notifier.state.syncStatus, restocks.SyncStatus.idle);
       expect(env.notifier.state.lastError, isNull);
+      // Produk bersih: sinkron berikutnya tidak push ulang.
+      expect((await env.db.getProduct('p1'))!.dirty, 0);
     });
+
+    test(
+      'sinkron 2x: restock tidak di-POST ulang',
+      () async {
+        var restockPosts = 0;
+        final env = await makeRestocks(
+          apiHandler: (options) async {
+            if (options.method == 'PUT') {
+              return ok(options, {
+                'id': 'p1',
+                'name': 'Indomie',
+                'barcode': null,
+                'costPrice': 2500,
+                'sellPrice': 3500,
+                'stock': 12,
+                'category': '',
+                'photoPath': '',
+                'updatedAt': '2026-01-01T00:00:00.000Z',
+                'deletedAt': null,
+              });
+            }
+            if (options.method == 'POST' &&
+                options.path.endsWith('/restocks')) {
+              restockPosts++;
+              return ok(options, restockJson(id: 'r$restockPosts'), 201);
+            }
+            return ok(options, []);
+          },
+        );
+        await env.notifier.addToDraft('p1', qty: 2);
+        await env.notifier.saveRestock();
+
+        await env.notifier.syncNow(accessToken: 'token');
+        await env.notifier.syncNow(accessToken: 'token');
+
+        // Hanya 1 POST restock: stok server hanya +2 sekali.
+        expect(restockPosts, 1);
+        expect(env.notifier.state.lastError, isNull);
+        expect((await env.db.getProduct('p1'))!.dirty, 0);
+        expect((await env.db.getProduct('p1'))!.stock, 12);
+      },
+    );
 
     test('syncNow offline -> status offline', () async {
       final env = await makeRestocks(
@@ -382,6 +438,64 @@ void main() {
         expect(
           env.notifier.state.lastError,
           contains('Barcode sudah dipakai'),
+        );
+      },
+    );
+
+    test(
+      'void lokal lalu sync -> POST /void terkirim, idle, bersih',
+      () async {
+        final events = <String>[];
+        final env = await makeRestocks(
+          apiHandler: (options) async {
+            if (options.method == 'PUT') {
+              return ok(options, {
+                'id': 'p1',
+                'name': 'Indomie',
+                'barcode': null,
+                'costPrice': 2500,
+                'sellPrice': 3500,
+                'stock': 10,
+                'category': '',
+                'photoPath': '',
+                'updatedAt': '2026-01-01T00:00:00.000Z',
+                'deletedAt': null,
+              });
+            }
+            if (options.path.endsWith('/void')) {
+              events.add('void');
+              return ok(options, restockJson(status: 'voided'));
+            }
+            if (options.method == 'POST' &&
+                options.path.endsWith('/restocks')) {
+              events.add('restock');
+              return ok(options, restockJson(), 201);
+            }
+            return ok(options, []);
+          },
+        );
+        await env.notifier.addToDraft('p1', qty: 2);
+        await env.notifier.saveRestock();
+        final id = env.notifier.state.history.single.id;
+
+        await env.notifier.syncNow(accessToken: 'token');
+        expect(events, ['restock']);
+
+        // Batalkan lokal, lalu sinkron lagi: harus POST /void, bukan
+        // POST ulang dokumen (yang pasti 404/gagal). Stok lokal kembali.
+        await env.notifier.voidRestock(id, 'salah input');
+        expect((await env.db.getProduct('p1'))!.stock, 10);
+
+        await env.notifier.syncNow(accessToken: 'token');
+
+        // RED: kode saat ini POST ulang dokumen untuk baris voided
+        // (tidak ada cabang void) -> events ['restock','restock'].
+        expect(events, ['restock', 'void']);
+        expect(env.notifier.state.syncStatus, restocks.SyncStatus.idle);
+        expect(env.notifier.state.lastError, isNull);
+        expect(
+          env.notifier.state.history.singleWhere((e) => e.id == id).isVoided,
+          isTrue,
         );
       },
     );

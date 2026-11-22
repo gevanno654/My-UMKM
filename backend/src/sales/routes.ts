@@ -95,8 +95,104 @@ salesRouter.get("/", async (req, res) => {
   return res.status(200).json(out);
 });
 
+// Batalkan transaksi beraudit: status -> voided + alasan wajib,
+// stok dikembalikan (+qty). Void sale tidak pernah 409 (menambah stok).
+salesRouter.post("/:id/void", async (req, res) => {
+  const storeId = storeIdOf(req);
+  const reasonRaw =
+    typeof req.body?.reason === "string" ? req.body.reason.trim() : "";
+  if (!reasonRaw) {
+    return res.status(400).json({ error: "reason required" });
+  }
+  const client = await getPool().connect();
+  try {
+    await client.query("BEGIN");
+    const found = await client.query(
+      `SELECT id, status FROM sales
+        WHERE id = $1::uuid AND store_id = $2::uuid`,
+      [req.params.id, storeId],
+    );
+    if (found.rowCount === 0) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({ error: "not found" });
+    }
+    // Idempotent: sudah voided -> kembalikan sukses tanpa mutasi ulang.
+    if (found.rows[0].status === "voided") {
+      const items = await client.query(
+        `SELECT id, product_id, name, price, qty, subtotal
+           FROM sale_items WHERE sale_id = $1 ORDER BY name`,
+        [req.params.id],
+      );
+      const cur = await client.query(
+        `SELECT id, number, total, paid, change, method, status,
+                void_reason, created_at, updated_at, voided_at
+           FROM sales WHERE id = $1::uuid`,
+        [req.params.id],
+      );
+      await client.query("ROLLBACK");
+      return res.status(200).json(
+        toJson(
+          cur.rows[0],
+          items.rows.map((r) => ({
+            id: r.id,
+            productId: r.product_id,
+            name: r.name,
+            price: r.price,
+            qty: r.qty,
+            subtotal: r.subtotal,
+          })),
+        ),
+      );
+    }
+    const items = await client.query(
+      `SELECT product_id, qty FROM sale_items WHERE sale_id = $1`,
+      [req.params.id],
+    );
+    for (const item of items.rows) {
+      if (item.product_id == null) continue;
+      await client.query(
+        "UPDATE products SET stock = stock + $2, updated_at = now() WHERE id = $1::uuid",
+        [item.product_id, item.qty],
+      );
+    }
+    const updated = await client.query(
+      `UPDATE sales SET status = 'voided', void_reason = $2,
+         voided_at = now(), updated_at = now()
+         WHERE id = $1::uuid
+         RETURNING id, number, total, paid, change, method, status,
+                   void_reason, created_at, updated_at, voided_at`,
+      [req.params.id, reasonRaw],
+    );
+    await client.query("COMMIT");
+    const outItems = await getPool().query(
+      `SELECT id, product_id, name, price, qty, subtotal
+         FROM sale_items WHERE sale_id = $1 ORDER BY name`,
+      [req.params.id],
+    );
+    return res.status(200).json(
+      toJson(
+        updated.rows[0],
+        outItems.rows.map((r) => ({
+          id: r.id,
+          productId: r.product_id,
+          name: r.name,
+          price: r.price,
+          qty: r.qty,
+          subtotal: r.subtotal,
+        })),
+      ),
+    );
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
+});
+
 // Buat transaksi: validasi stok (FOR UPDATE), insert sale+items,
 // decrement stok — semua dalam satu transaksi DB.
+// Idempotent: cek duplikat id DULU sebelum mutasi stok (retry HP).
 salesRouter.post("/", async (req, res) => {
   const storeId = storeIdOf(req);
   const parsed = saleSchema.safeParse(req.body);
@@ -112,6 +208,37 @@ salesRouter.post("/", async (req, res) => {
 
   const client = await getPool().connect();
   try {
+    // Cek duplikat SEBELUM mutasi (di luar transaksi agar retry cepat;
+    // INSERT tetap dilindungi PK bila race).
+    if (id != null) {
+      const existing = await client.query(
+        `SELECT id, number, total, paid, change, method, status,
+                void_reason, created_at, updated_at, voided_at
+           FROM sales WHERE id = $1::uuid AND store_id = $2::uuid`,
+        [id, storeId],
+      );
+      if ((existing.rowCount ?? 0) > 0) {
+        const prev = existing.rows[0];
+        const prevItems = await client.query(
+          `SELECT id, product_id, name, price, qty, subtotal
+             FROM sale_items WHERE sale_id = $1 ORDER BY name`,
+          [prev.id],
+        );
+        return res.status(201).json(
+          toJson(
+            prev,
+            prevItems.rows.map((r) => ({
+              id: r.id,
+              productId: r.product_id,
+              name: r.name,
+              price: r.price,
+              qty: r.qty,
+              subtotal: r.subtotal,
+            })),
+          ),
+        );
+      }
+    }
     await client.query("BEGIN");
     // Kunci baris produk agar 2 kasir bersamaan tidak menjual stok yang sama.
     const lines: {

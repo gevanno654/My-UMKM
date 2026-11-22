@@ -25,6 +25,9 @@ class SalesApi {
         if (code == 'paid less than total') {
           return 'Nominal bayar kurang dari total.';
         }
+        if (code == 'reason required') {
+          return 'Alasan void wajib diisi.';
+        }
         return 'Data tidak valid. Periksa kembali isian.';
       case 401:
         return 'Sesi kedaluwarsa. Silakan login ulang.';
@@ -86,6 +89,18 @@ class SalesApi {
       options: _auth(accessToken),
     );
     return _fromServer(res.data!);
+  }
+
+  Future<void> voidSale({
+    required String accessToken,
+    required String id,
+    required String reason,
+  }) async {
+    await _dio.post<void>(
+      '/api/v1/sales/$id/void',
+      data: {'reason': reason},
+      options: _auth(accessToken),
+    );
   }
 
   SaleModel _fromServer(Map<String, dynamic> data) {

@@ -266,6 +266,21 @@ class SalesNotifier extends Notifier<SalesState> {
     final dirty = await _db.dirtySales(_storeId);
     for (final row in dirty) {
       try {
+        // Baris voided: kirim pembatalan ke server, bukan POST ulang.
+        // 404 (sale belum pernah terkirim) = anggap sukses.
+        if (row.status == 'voided') {
+          try {
+            await _api.voidSale(
+              accessToken: accessToken,
+              id: row.id,
+              reason: row.voidReason ?? 'dibatalkan',
+            );
+          } on DioException catch (e) {
+            if (e.response?.statusCode != 404) rethrow;
+          }
+          await _db.markSalesClean([row.id]);
+          continue;
+        }
         // Sinkron kasir sekaligus sinkron produk: produk terkait di-push
         // DULU (stok cloud ikut terkini), baru sale di-POST sekali.
         await _pushMissingProducts(accessToken, row.id);

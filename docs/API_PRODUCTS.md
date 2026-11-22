@@ -34,6 +34,9 @@ Validasi gagal → `400 {error:'validation'}`.
 ## PUT /api/v1/products/:id → 200
 
 Partial update; beda store → `404 {error:'not found'}`; barcode duplikat → 409.
+**Stok tidak bisa diubah lewat PUT** (field `stock` di body diabaikan):
+stok server hanya berubah via dokumen restock/sale (relatif, atomik) agar
+sinkron HP tidak menimpa stok dengan angka absolut lokal (stok ganda).
 
 ## DELETE /api/v1/products/:id → 200
 

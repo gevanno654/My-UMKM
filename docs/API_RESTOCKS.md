@@ -37,6 +37,9 @@ Error:
 | 401 `missing token` | tanpa/expired token |
 | 404 `product not found` | productId milik toko lain / tidak ada / terhapus |
 
+Idempotent: `POST` dengan `id` yang sudah ada → 201 berisi dokumen lama
+tanpa mutasi stok ulang (aman untuk retry HP).
+
 ## POST /api/v1/restocks/:id/void
 
 Membatalkan penerimaan beraudit: status → `voided` + alasan wajib, stok

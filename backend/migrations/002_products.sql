@@ -12,4 +12,4 @@ CREATE TABLE IF NOT EXISTS products (
   updated_at timestamptz NOT NULL DEFAULT now(),
   deleted_at timestamptz NULL
 );
-CREATE UNIQUE INDEX IF NOT EXISTS uq_products_store_barcode ON products(store_id, barcode) WHERE barcode IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_products_store_barcode_active ON products(store_id, barcode) WHERE barcode IS NOT NULL AND deleted_at IS NULL;

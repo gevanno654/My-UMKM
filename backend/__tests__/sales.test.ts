@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -29,6 +30,7 @@ async function applyMigration(file: string) {
 beforeAll(async () => {
   await applyMigration("001_init.sql");
   await applyMigration("002_products.sql");
+  await applyMigration("005_products_barcode_active.sql");
   await applyMigration("003_sales.sql");
   await getPool().query(
     "TRUNCATE refresh_tokens, users, sale_items, sales, products, stores RESTART IDENTITY CASCADE",
@@ -62,18 +64,127 @@ afterAll(async () => {
 });
 
 describe("POST /api/v1/sales", () => {
+  it("sale id sama di-POST 2x paralel (retry HP) -> 1 baris, stok -sekali", async () => {
+    const retryId = crypto.randomUUID();
+    const before = await getPool().query(
+      "SELECT stock FROM products WHERE id = $1",
+      [productIdA],
+    );
+    const base = before.rows[0].stock as number;
+
+    const [r1, r2] = await Promise.all([
+      request(app)
+        .post("/api/v1/sales")
+        .set("Authorization", `Bearer ${tokenA}`)
+        .send({
+          id: retryId,
+          number: `RK${stamp}R1`,
+          items: [{ productId: productIdA, qty: 1 }],
+          paid: 3500,
+          method: "tunai",
+        }),
+      request(app)
+        .post("/api/v1/sales")
+        .set("Authorization", `Bearer ${tokenA}`)
+        .send({
+          id: retryId,
+          number: `RK${stamp}R1`,
+          items: [{ productId: productIdA, qty: 1 }],
+          paid: 3500,
+          method: "tunai",
+        }),
+    ]);
+    expect([r1.status, r2.status]).toEqual([201, 201]);
+
+    const after = await getPool().query(
+      "SELECT stock FROM products WHERE id = $1",
+      [productIdA],
+    );
+    expect(after.rows[0].stock).toBe(base - 1);
+  });
+
+  it("void + alasan -> status voided, stok kembali (+qty)", async () => {
+    const before = await getPool().query(
+      "SELECT stock FROM products WHERE id = $1",
+      [productIdA],
+    );
+    const base = before.rows[0].stock as number;
+    const created = await request(app)
+      .post("/api/v1/sales")
+      .set("Authorization", `Bearer ${tokenA}`)
+      .send({
+        number: `RK${stamp}V1`,
+        items: [{ productId: productIdA, qty: 2 }],
+        paid: 7000,
+        method: "tunai",
+      });
+    expect(created.status).toBe(201);
+    const id = created.body.id as string;
+
+    const res = await request(app)
+      .post(`/api/v1/sales/${id}/void`)
+      .set("Authorization", `Bearer ${tokenA}`)
+      .send({ reason: "salah input" });
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe("voided");
+
+    const prod = await getPool().query(
+      "SELECT stock FROM products WHERE id = $1",
+      [productIdA],
+    );
+    // -2 lalu +2 (void) = kembali ke dasar.
+    expect(prod.rows[0].stock).toBe(base);
+  });
+
+  it("void 2x (retry) -> tetap 200, stok +sekali", async () => {
+    const before = await getPool().query(
+      "SELECT stock FROM products WHERE id = $1",
+      [productIdA],
+    );
+    const base = before.rows[0].stock as number;
+    const created = await request(app)
+      .post("/api/v1/sales")
+      .set("Authorization", `Bearer ${tokenA}`)
+      .send({
+        number: `RK${stamp}V2`,
+        items: [{ productId: productIdA, qty: 1 }],
+        paid: 3500,
+        method: "tunai",
+      });
+    const id = created.body.id as string;
+
+    for (let i = 0; i < 2; i++) {
+      const res = await request(app)
+        .post(`/api/v1/sales/${id}/void`)
+        .set("Authorization", `Bearer ${tokenA}`)
+        .send({ reason: "salah" });
+      expect(res.status).toBe(200);
+    }
+
+    const prod = await getPool().query(
+      "SELECT stock FROM products WHERE id = $1",
+      [productIdA],
+    );
+    expect(prod.rows[0].stock).toBe(base);
+  });
+
   it("tunai valid -> 201, total benar, stok berkurang", async () => {
+    const before = await getPool().query(
+      "SELECT stock FROM products WHERE id = $1",
+      [productIdA],
+    );
+    const base = before.rows[0].stock as number;
     const res = await request(app)
       .post("/api/v1/sales")
       .set("Authorization", `Bearer ${tokenA}`)
       .send({
-        number: "TE010120260001",
+        number: `TE${stamp}N1`,
         items: [{ productId: productIdA, qty: 2 }],
         paid: 10000,
         method: "tunai",
       });
     expect(res.status).toBe(201);
-    expect(res.body.number).toBe("TE010120260001");
+    expect(res.body.number).toBe(`TE${stamp}N1`);
     expect(res.body.total).toBe(7000);
     expect(res.body.change).toBe(3000);
 
@@ -81,7 +192,7 @@ describe("POST /api/v1/sales", () => {
       "SELECT stock FROM products WHERE id = $1",
       [productIdA],
     );
-    expect(prod.rows[0].stock).toBe(8);
+    expect(prod.rows[0].stock).toBe(base - 2);
   });
 
   it("nomor duplikat di toko sama -> 409", async () => {
@@ -89,7 +200,7 @@ describe("POST /api/v1/sales", () => {
       .post("/api/v1/sales")
       .set("Authorization", `Bearer ${tokenA}`)
       .send({
-        number: "TE010120260001",
+        number: `TE${stamp}N1`,
         items: [{ productId: productIdA, qty: 1 }],
         paid: 3500,
         method: "tunai",
@@ -157,9 +268,8 @@ describe("GET /api/v1/sales", () => {
       .get("/api/v1/sales")
       .set("Authorization", `Bearer ${tokenA}`);
     expect(resA.status).toBe(200);
-    expect(resA.body.length).toBe(1);
-    expect(resA.body[0].items.length).toBe(1);
-    expect(resA.body[0].items[0].qty).toBe(2);
+    expect(resA.body.length).toBeGreaterThan(0);
+    expect(resA.body[0].items.length).toBeGreaterThan(0);
 
     const resB = await request(app)
       .get("/api/v1/sales")

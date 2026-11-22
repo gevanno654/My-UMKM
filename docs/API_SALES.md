@@ -59,6 +59,24 @@ Error:
 | 409 `insufficient stock` | stok kurang (tidak ada yang berubah) |
 | 409 `number taken` | nomor struk sudah dipakai di toko ini |
 
+Idempotent: `POST` dengan `id` yang sudah ada → 201 berisi dokumen lama
+tanpa mutasi stok ulang (aman untuk retry HP).
+
+## POST /api/v1/sales/:id/void
+
+Batalkan transaksi beraudit: `status` → `voided` + alasan wajib, stok
+dikembalikan (`+qty`, tidak pernah 409).
+
+Request: `{ "reason": "salah input" }`.
+
+| Kode | Arti |
+| ---- | ---- |
+| 400 `reason required` | alasan kosong |
+| 404 `not found` | sale tidak ada / beda toko (termasuk belum pernah tersinkron) |
+| 401 `missing token` | tanpa/expired token |
+
+Sudah voided → 200 idempoten tanpa mutasi ulang.
+
 ## GET /api/v1/sales
 
 Daftar transaksi toko sendiri + items nested, terbaru dulu. Format item

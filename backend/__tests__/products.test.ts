@@ -120,6 +120,28 @@ describe("PUT /api/v1/products/:id", () => {
       .send({ name: "Diubah B" });
     expect(res.status).toBe(404);
   });
+
+  it("sync dokumen tidak boleh menimpa stok absolut (stok via dokumen)", async () => {
+    // Skenario laporan bug 1: server stok 10; HP sudah restock +5 (lokal 15)
+    // lalu PUT sync membawa stock:15 absolut -> server ikut 15, kemudian
+    // POST /restocks +5 lagi -> 20 (dobel). PUT sync dokumen harus
+    // MENGABAIKAN field stock: stok server hanya berubah via dokumen
+    // restock/sale (relatif). Katalog biasa (nama/harga) tetap boleh di-PUT.
+    const put = await request(app)
+      .put(`/api/v1/products/${productIdA}`)
+      .set("Authorization", `Bearer ${tokenA}`)
+      .send({ name: "Indomie Goreng", stock: 15 });
+    expect(put.status).toBe(200);
+
+    const prod = await getPool().query(
+      "SELECT stock, name FROM products WHERE id = $1",
+      [productIdA],
+    );
+    // RED: kode saat ini menimpa absolut -> 15. Harusnya tetap 10,
+    // sedangkan nama tetap ikut berubah (PUT katalog biasa jalan).
+    expect(prod.rows[0].stock).toBe(10);
+    expect(prod.rows[0].name).toBe("Indomie Goreng");
+  });
 });
 
 describe("DELETE /api/v1/products/:id", () => {

@@ -125,13 +125,16 @@ productsRouter.put("/:id", async (req, res) => {
     p.barcode === undefined ? undefined : normalizeBarcode(p.barcode);
   try {
     const rows = await getPool().query(
+      // Stok SENGAJA tidak bisa diubah lewat PUT: stok server hanya berubah
+      // via dokumen restock/sale (relatif, atomik). PUT sync yang membawa
+      // stok absolut lokal (hasil mutasi lokal) akan menimpa stok server
+      // yang sudah benar -> stok ganda. Field stock di body diabaikan.
       `UPDATE products SET
          name = COALESCE($3, name),
-         barcode = CASE WHEN $9 THEN barcode ELSE $4::text END,
+         barcode = CASE WHEN $8 THEN barcode ELSE $4::text END,
          cost_price = COALESCE($5, cost_price),
          sell_price = COALESCE($6, sell_price),
-         stock = COALESCE($7, stock),
-         category = COALESCE($8, category),
+         category = COALESCE($7, category),
          updated_at = now()
        WHERE id = $1::uuid AND store_id = $2::uuid AND deleted_at IS NULL
        RETURNING id, name, barcode, cost_price, sell_price, stock, category,
@@ -143,7 +146,6 @@ productsRouter.put("/:id", async (req, res) => {
         barcode ?? null,
         p.costPrice ?? null,
         p.sellPrice ?? null,
-        p.stock ?? null,
         p.category ?? null,
         p.barcode === undefined,
       ],

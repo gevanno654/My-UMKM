@@ -102,6 +102,38 @@ restocksRouter.post("/", async (req, res) => {
 
   const client = await getPool().connect();
   try {
+    // Idempotent: cek duplikat id DULU sebelum mutasi stok. Retry HP
+    // (timeout lalu kirim ulang id sama) tidak boleh menambah stok 2x.
+    if (id != null) {
+      const existing = await client.query(
+        `SELECT id, total, status, void_reason, created_at, updated_at, voided_at
+           FROM restocks WHERE id = $1::uuid AND store_id = $2::uuid`,
+        [id, storeId],
+      );
+      if ((existing.rowCount ?? 0) > 0) {
+        const prev = existing.rows[0];
+        const prevItems = await client.query(
+          `SELECT id, product_id, name, qty, cost_price, sell_price, subtotal
+             FROM restock_items WHERE restock_id = $1 ORDER BY name`,
+          [prev.id],
+        );
+        await client.query("ROLLBACK");
+        return res.status(201).json(
+          toJson(
+            prev,
+            prevItems.rows.map((i) => ({
+              id: i.id,
+              productId: i.product_id,
+              name: i.name,
+              qty: i.qty,
+              costPrice: i.cost_price,
+              sellPrice: i.sell_price,
+              subtotal: i.subtotal,
+            })),
+          ),
+        );
+      }
+    }
     await client.query("BEGIN");
     const lines: {
       productId: string;
