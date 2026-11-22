@@ -584,7 +584,10 @@ class AppDb extends _$AppDb {
   // ------------------------------------------------------------------
 
   /// Simpan penyesuaian atomik: insert adjustment + `SET stock = fisik`.
-  /// Produk jadi `dirty` (ikut push sinkron).
+  /// Produk TIDAK ditandai dirty: stok baru terkirim ke server via POST
+  /// adjustment (server menerapkan diff, bukan stok absolut). Kalau produk
+  /// ikut dirty, sync Kelola Produk lebih dulu akan PUT (stok diabaikan,
+  /// updated_at bump) lalu pull LWW menimpa stok opname dengan stok lama.
   /// Throw [ArgumentError] bila alasan kosong / diff 0,
   /// [StateError] bila produk tidak ada (tidak ada yang berubah).
   Future<void> saveAdjustmentFull({
@@ -611,7 +614,6 @@ class AppDb extends _$AppDb {
         ProductsCompanion(
           stock: Value(physicalStock),
           updatedAt: Value(DateTime.now().toUtc().millisecondsSinceEpoch),
-          dirty: const Value(1),
         ),
       );
       final now = DateTime.now().toUtc().millisecondsSinceEpoch;
@@ -646,7 +648,9 @@ class AppDb extends _$AppDb {
           .get();
 
   /// Batal beraudit: status → voided + alasan wajib, stok dikembalikan
-  /// (`stock − diff`). Throw [ArgumentError] bila alasan kosong,
+  /// (`stock − diff`). Produk TIDAK ditandai dirty (alasan sama seperti
+  /// saveAdjustmentFull: void terkirim via API pembatalan, bukan PUT).
+  /// Throw [ArgumentError] bila alasan kosong,
   /// [StateError] bila hasil kembali < 0 — tidak ada yang berubah.
   Future<void> voidAdjustment({
     required String id,
@@ -673,7 +677,6 @@ class AppDb extends _$AppDb {
             ProductsCompanion(
               stock: Value(back),
               updatedAt: Value(nowMillis),
-              dirty: const Value(1),
             ),
           );
         }

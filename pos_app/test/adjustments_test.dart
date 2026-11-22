@@ -96,6 +96,8 @@ Future<({adj.AdjustmentsNotifier notifier, AppDb db})> makeAdjustments({
       updatedAt: 1,
     ),
   );
+  // upsertProduct selalu menandai dirty=1; seed dianggap sudah tersinkron.
+  await db.markClean(['p1']);
   final notifier = container.read(adj.adjustmentsProvider.notifier);
   await notifier.load('store-1');
   return (notifier: notifier, db: db);
@@ -116,8 +118,7 @@ void main() {
       expect(env.notifier.state.history.single.diff, 4);
     });
 
-    test('fisik turun 10 -> 7: diff -3', () async {
-      final env = await makeAdjustments();
+    test('fisik turun 10 -> 7: diff -3', () async {      final env = await makeAdjustments();
       final err = await env.notifier.adjustStock(
         productId: 'p1',
         physicalStock: 7,
@@ -352,5 +353,36 @@ void main() {
 
       expect(env.notifier.state.syncStatus, adj.SyncStatus.offline);
     });
+
+    test(
+      'REGRESI: opname tidak menandai produk dirty '
+      '(stok terkirim via POST, PUT abaikan stok)', () async {
+        final env = await makeAdjustments();
+        await env.notifier.adjustStock(
+          productId: 'p1',
+          physicalStock: 14,
+          reason: 'selip',
+        );
+
+        expect((await env.db.getProduct('p1'))!.stock, 14);
+        expect((await env.db.getProduct('p1'))!.dirty, 0);
+      },
+    );
+
+    test(
+      'REGRESI: void tidak menandai produk dirty', () async {
+        final env = await makeAdjustments();
+        await env.notifier.adjustStock(
+          productId: 'p1',
+          physicalStock: 14,
+          reason: 'selip',
+        );
+        final id = env.notifier.state.history.single.id;
+        await env.notifier.voidAdjustment(id, 'salah hitung');
+
+        expect((await env.db.getProduct('p1'))!.stock, 10);
+        expect((await env.db.getProduct('p1'))!.dirty, 0);
+      },
+    );
   });
 }
