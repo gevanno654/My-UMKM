@@ -1,6 +1,7 @@
 import express from "express";
 import { authRouter, meRouter } from "./auth/routes";
 import { productsRouter } from "./products/routes";
+import { adjustmentsRouter } from "./adjustments/routes";
 import { restocksRouter } from "./restocks/routes";
 import { salesRouter } from "./sales/routes";
 
@@ -17,3 +18,4 @@ app.use("/api/v1", meRouter);
 app.use("/api/v1/products", productsRouter);
 app.use("/api/v1/sales", salesRouter);
 app.use("/api/v1/restocks", restocksRouter);
+app.use("/api/v1/adjustments", adjustmentsRouter);
