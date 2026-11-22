@@ -136,6 +136,31 @@ class RestockItems extends Table {
   Set<Column> get primaryKey => {id};
 }
 
+/// Penyesuaian stok opname (offline-first, sumber utama HP).
+///
+/// - `stockBefore/stockAfter`: angka sistem vs hasil hitung fisik.
+/// - `diff` = after − before (boleh negatif); 0 ditolak (bukan dokumen).
+/// - `status`: 'ok' | 'voided'; void butuh `voidReason`.
+class Adjustments extends Table {
+  TextColumn get id => text()();
+  TextColumn get storeId => text()();
+  TextColumn get productId => text().nullable()();
+  TextColumn get name => text()();
+  IntColumn get stockBefore => integer()();
+  IntColumn get stockAfter => integer()();
+  IntColumn get diff => integer()();
+  TextColumn get reason => text()();
+  TextColumn get status => text().withDefault(const Constant('ok'))();
+  TextColumn get voidReason => text().nullable()();
+  IntColumn get createdAt => integer()();
+  IntColumn get updatedAt => integer().nullable()();
+  IntColumn get voidedAt => integer().nullable()();
+  IntColumn get dirty => integer().withDefault(const Constant(1))();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
 /// Keranjang belanja persist (tahan pindah layar + restart HP).
 /// Satu baris per (storeId, productId).
 class CartLines extends Table {
@@ -147,7 +172,7 @@ class CartLines extends Table {
   Set<Column> get primaryKey => {storeId, productId};
 }
 
-@DriftDatabase(tables: [LocalStores, LocalUsers, Products, Sales, SaleItems, CartLines, Restocks, RestockItems])
+@DriftDatabase(tables: [LocalStores, LocalUsers, Products, Sales, SaleItems, CartLines, Restocks, RestockItems, Adjustments])
 class AppDb extends _$AppDb {
   AppDb(super.executor);
 
@@ -159,7 +184,7 @@ class AppDb extends _$AppDb {
   static AppDb openMemory() => AppDb(openMemoryDb());
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -181,6 +206,10 @@ class AppDb extends _$AppDb {
       if (from <= 3) {
         await m.createTable(restocks);
         await m.createTable(restockItems);
+      }
+      // v4 → v5: tambah tabel penyesuaian opname (adjustments).
+      if (from <= 4) {
+        await m.createTable(adjustments);
       }
     },
   );
@@ -547,6 +576,138 @@ class AppDb extends _$AppDb {
   /// Status voided server menang atas ok lokal.
   Future<void> upsertRestockFromServer(RestocksCompanion entry) =>
       into(restocks).insertOnConflictUpdate(
+        entry.copyWith(dirty: const Value(0)),
+      );
+
+  // ------------------------------------------------------------------
+  // Opname (penyesuaian stok atomik, batal beraudit, sinkron).
+  // ------------------------------------------------------------------
+
+  /// Simpan penyesuaian atomik: insert adjustment + `SET stock = fisik`.
+  /// Produk jadi `dirty` (ikut push sinkron).
+  /// Throw [ArgumentError] bila alasan kosong / diff 0,
+  /// [StateError] bila produk tidak ada (tidak ada yang berubah).
+  Future<void> saveAdjustmentFull({
+    required AdjustmentsCompanion adjustment,
+    required int physicalStock,
+  }) {
+    if ((adjustment.reason.value).trim().isEmpty) {
+      throw ArgumentError('Alasan penyesuaian wajib diisi');
+    }
+    return transaction(() async {
+      final productId = adjustment.productId.value;
+      if (productId == null) {
+        throw StateError('product not found');
+      }
+      final product = await getProduct(productId);
+      if (product == null) {
+        throw StateError('product not found');
+      }
+      final diff = physicalStock - product.stock;
+      if (diff == 0) {
+        throw ArgumentError('Stok sama, tidak ada perubahan');
+      }
+      await (update(products)..where((t) => t.id.equals(productId))).write(
+        ProductsCompanion(
+          stock: Value(physicalStock),
+          updatedAt: Value(DateTime.now().toUtc().millisecondsSinceEpoch),
+          dirty: const Value(1),
+        ),
+      );
+      final now = DateTime.now().toUtc().millisecondsSinceEpoch;
+      await into(adjustments).insert(
+        adjustment.copyWith(
+          stockBefore: Value(product.stock),
+          stockAfter: Value(physicalStock),
+          diff: Value(diff),
+          reason: Value(adjustment.reason.value.trim()),
+          updatedAt: Value(now),
+          dirty: const Value(1),
+        ),
+      );
+    });
+  }
+
+  Future<Adjustment?> getAdjustment(String id) =>
+      (select(adjustments)..where((t) => t.id.equals(id))).getSingleOrNull();
+
+  /// Riwayat penyesuaian toko, terbaru dulu.
+  Future<List<Adjustment>> adjustmentsHistory(String storeId) =>
+      (select(adjustments)
+            ..where((t) => t.storeId.equals(storeId))
+            ..orderBy([(t) => OrderingTerm.desc(t.createdAt)]))
+          .get();
+
+  /// Riwayat penyesuaian satu produk, terbaru dulu.
+  Future<List<Adjustment>> adjustmentsOfProduct(String productId) =>
+      (select(adjustments)
+            ..where((t) => t.productId.equals(productId))
+            ..orderBy([(t) => OrderingTerm.desc(t.createdAt)]))
+          .get();
+
+  /// Batal beraudit: status → voided + alasan wajib, stok dikembalikan
+  /// (`stock − diff`). Throw [ArgumentError] bila alasan kosong,
+  /// [StateError] bila hasil kembali < 0 — tidak ada yang berubah.
+  Future<void> voidAdjustment({
+    required String id,
+    required String reason,
+    required int nowMillis,
+  }) {
+    if (reason.trim().isEmpty) {
+      throw ArgumentError('Alasan batal wajib diisi');
+    }
+    return transaction(() async {
+      final row = await getAdjustment(id);
+      if (row == null) {
+        throw StateError('adjustment not found');
+      }
+      final productId = row.productId;
+      if (productId != null) {
+        final product = await getProduct(productId);
+        if (product != null) {
+          final back = product.stock - row.diff;
+          if (back < 0) {
+            throw StateError('insufficient stock');
+          }
+          await (update(products)..where((t) => t.id.equals(productId))).write(
+            ProductsCompanion(
+              stock: Value(back),
+              updatedAt: Value(nowMillis),
+              dirty: const Value(1),
+            ),
+          );
+        }
+        // Produk terhapus: tetap void, stok tak kembali.
+      }
+      await (update(adjustments)..where((t) => t.id.equals(id))).write(
+        AdjustmentsCompanion(
+          status: const Value('voided'),
+          voidReason: Value(reason.trim()),
+          voidedAt: Value(nowMillis),
+          updatedAt: Value(nowMillis),
+          dirty: const Value(1),
+        ),
+      );
+    });
+  }
+
+  /// Tandai adjustment sudah tersinkron (push sukses).
+  Future<void> markAdjustmentsClean(List<String> ids) =>
+      (update(adjustments)..where((t) => t.id.isIn(ids))).write(
+        const AdjustmentsCompanion(dirty: Value(0)),
+      );
+
+  /// Adjustment kotor milik toko (belum ter-push ke server).
+  Future<List<Adjustment>> dirtyAdjustments(String storeId) =>
+      (select(adjustments)
+            ..where((t) => t.storeId.equals(storeId) & t.dirty.equals(1))
+            ..orderBy([(t) => OrderingTerm.asc(t.createdAt)]))
+          .get();
+
+  /// Upsert adjustment dari server (pull): baris server selalu bersih.
+  /// Status voided server menang atas ok lokal.
+  Future<void> upsertAdjustmentFromServer(AdjustmentsCompanion entry) =>
+      into(adjustments).insertOnConflictUpdate(
         entry.copyWith(dirty: const Value(0)),
       );
 
