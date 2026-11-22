@@ -288,6 +288,10 @@ class ProductsNotifier extends Notifier<ProductsState> {
     }
   }
 
+  /// Pull katalog = backup metadata: nama/harga/foto/delete boleh masuk
+  /// dari server (LWW), tetapi STOK LOKAL TIDAK PERNAH DITIMPA angka
+  /// server. HP adalah otoritas stok; sinkron hanya menitipkan data ke
+  /// cloud, bukan mengambil alih angka aplikasi.
   Future<void> pullCatalog(String accessToken) async {
     final server = await _api.list(accessToken, _storeId);
     for (final s in server) {
@@ -323,7 +327,7 @@ class ProductsNotifier extends Notifier<ProductsState> {
         }
         continue;
       }
-      // LWW: server menang bila lebih baru.
+      // LWW metadata: kolom katalog ikut server, stok tetap milik lokal.
       if (s.updatedAt > localModel.updatedAt) {
         await _db.upsertProduct(
           ProductsCompanion.insert(
@@ -333,7 +337,7 @@ class ProductsNotifier extends Notifier<ProductsState> {
             barcode: Value(s.barcode),
             costPrice: s.costPrice,
             sellPrice: s.sellPrice,
-            stock: Value(s.stock),
+            stock: Value(localModel.stock),
             category: Value(s.category),
             photoPath: Value(s.photoPath),
             isArchived: Value(localModel.isArchived),

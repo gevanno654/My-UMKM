@@ -13,6 +13,7 @@ import 'package:pos_app/features/restocks/restocks_api.dart';
 import 'package:pos_app/features/restocks/restocks_provider.dart' as restocks;
 import 'package:pos_app/features/sales/sales_api.dart';
 import 'package:pos_app/features/sales/sales_provider.dart' as sales;
+import 'package:pos_app/features/sales/sale_model.dart';
 import 'package:pos_app/features/adjustments/adjustments_api.dart';
 import 'package:pos_app/features/adjustments/adjustments_provider.dart'
     as adj;
@@ -49,10 +50,14 @@ class _FakeAuthNotifier extends AuthNotifier {
 }
 
 /// Env sync global: produk p1 stok 0 + restock qty 5 tersimpan lokal.
-Future<({SyncAllNotifier notifier, AppDb db})> makeSyncAll({
+Future<
+  ({SyncAllNotifier notifier, AppDb db, ProviderContainer container})
+>
+makeSyncAll({
   required Future<Response<dynamic>> Function(RequestOptions options)
   apiHandler,
   int initialStock = 0,
+  bool seedRestock = true,
 }) async {
   final dio = Dio(BaseOptions(baseUrl: 'http://localhost:3000'));
   dio.interceptors.add(
@@ -99,16 +104,54 @@ Future<({SyncAllNotifier notifier, AppDb db})> makeSyncAll({
     ),
   );
   await db.markClean(['p1']);
-  // Restock lokal qty 5 -> stok jadi initialStock + 5, dokumen dirty.
-  final restocksNotifier = container.read(restocks.restocksProvider.notifier);
-  await restocksNotifier.load('store-1');
-  final draftErr = await restocksNotifier.addToDraft('p1', qty: 5);
-  assert(draftErr == null, draftErr);
-  final saveErr = await restocksNotifier.saveRestock();
-  assert(saveErr == null, saveErr);
+  if (seedRestock) {
+    // Restock lokal qty 5 -> stok jadi initialStock + 5, dokumen dirty.
+    final restocksNotifier = container.read(
+      restocks.restocksProvider.notifier,
+    );
+    await restocksNotifier.load('store-1');
+    final draftErr = await restocksNotifier.addToDraft('p1', qty: 5);
+    assert(draftErr == null, draftErr);
+    final saveErr = await restocksNotifier.saveRestock();
+    assert(saveErr == null, saveErr);
+  }
   final notifier = container.read(syncAllProvider.notifier);
-  return (notifier: notifier, db: db);
+  return (notifier: notifier, db: db, container: container);
 }
+
+Never fail(RequestOptions options, int statusCode, Object? data) {
+  throw DioException(
+    requestOptions: options,
+    response: Response(
+      requestOptions: options,
+      statusCode: statusCode,
+      data: data,
+    ),
+    type: DioExceptionType.badResponse,
+  );
+}
+
+Map<String, dynamic> saleJson() => {
+  'id': 's1',
+  'number': 'TE010120260001',
+  'total': 17500,
+  'paid': 17500,
+  'change': 0,
+  'method': 'tunai',
+  'status': 'ok',
+  'voidReason': null,
+  'createdAt': '2026-01-01T00:00:00.000Z',
+  'items': [
+    {
+      'id': 'i1',
+      'productId': 'p1',
+      'name': 'Indomie',
+      'price': 3500,
+      'qty': 5,
+      'subtotal': 17500,
+    },
+  ],
+};
 
 Response<dynamic> ok(RequestOptions options, Object data, [int code = 200]) =>
     Response(requestOptions: options, statusCode: code, data: data);
@@ -131,6 +174,135 @@ Map<String, dynamic> serverProduct({
 
 void main() {
   group('sinkron global', () {
+    test(
+      'REGRESI laporan: produk baru + 2 restock + 1 sale -> stok tetap 5, '
+      'tanpa error stok server',
+      () async {
+        // Server tiruan realistis: punya logika stok sendiri seperti
+        // backend asli (stok hanya berubah via dokumen, bukan PUT).
+        var serverStock = 0;
+        var productExists = false;
+        final seenDocIds = <String>{};
+        var saleAttempts = 0;
+        final env = await makeSyncAll(
+          seedRestock: false,
+          apiHandler: (options) async {
+            final path = options.path;
+            // POST produk baru: stok awal 0 (baseline server).
+            if (options.method == 'POST' && path.endsWith('/products')) {
+              productExists = true;
+              serverStock = 0;
+              final body = options.data as Map<String, dynamic>;
+              return ok(options, serverProduct(
+                stock: 0,
+                updatedAt: '2026-11-22T00:00:01.000Z',
+              )..['name'] = body['name'], 201);
+            }
+            // PUT katalog: stok diabaikan (seperti backend asli).
+            if (options.method == 'PUT' && path.contains('/products/')) {
+              if (!productExists) {
+                return fail(options, 404, {'error': 'not found'});
+              }
+              return ok(options, serverProduct(stock: serverStock));
+            }
+            // POST restock: stok server += qty (idempoten per id).
+            if (options.method == 'POST' && path.endsWith('/restocks')) {
+              final body = options.data as Map<String, dynamic>;
+              if (!productExists) {
+                return fail(options, 404, {'error': 'product not found'});
+              }
+              final id = body['id'] as String?;
+              if (id != null && !seenDocIds.add(id)) {
+                return ok(options, {
+                  'id': id,
+                  'total': 0,
+                  'status': 'ok',
+                  'voidReason': null,
+                  'createdAt': '2026-01-01T00:00:00.000Z',
+                  'items': [],
+                }, 201);
+              }
+              var qty = 0;
+              for (final i in (body['items'] as List)) {
+                qty += (i as Map<String, dynamic>)['qty'] as int;
+              }
+              serverStock += qty;
+              return ok(options, {
+                'id': id ?? 'r-x',
+                'total': 0,
+                'status': 'ok',
+                'voidReason': null,
+                'createdAt': '2026-01-01T00:00:00.000Z',
+                'items': [],
+              }, 201);
+            }
+            // POST sale: tolak bila stok server kurang (seperti backend).
+            if (options.method == 'POST' && path.endsWith('/sales')) {
+              saleAttempts++;
+              if (!productExists) {
+                return fail(options, 404, {'error': 'product not found'});
+              }
+              final body = options.data as Map<String, dynamic>;
+              final id = body['id'] as String?;
+              if (id != null && !seenDocIds.add(id)) {
+                return ok(options, saleJson(), 201);
+              }
+              var qty = 0;
+              for (final i in (body['items'] as List)) {
+                qty += (i as Map<String, dynamic>)['qty'] as int;
+              }
+              if (serverStock < qty) {
+                return fail(
+                  options,
+                  409,
+                  {'error': 'insufficient stock'},
+                );
+              }
+              serverStock -= qty;
+              return ok(options, saleJson(), 201);
+            }
+            if (options.method == 'GET' && path.endsWith('/products')) {
+              if (!productExists) return ok(options, []);
+              return ok(options, [serverProduct(stock: serverStock)]);
+            }
+            return ok(options, []);
+          },
+        );
+
+        final db = env.db;
+        final container = env.container;
+        // Skenario laporan: 2x restock 5 lalu jual 5 (stok lokal 5).
+        final restocksNotifier = container.read(
+          restocks.restocksProvider.notifier,
+        );
+        await restocksNotifier.load('store-1');
+        assert(await restocksNotifier.addToDraft('p1', qty: 5) == null);
+        assert(await restocksNotifier.saveRestock() == null);
+        restocksNotifier.clearDraft();
+        assert(await restocksNotifier.addToDraft('p1', qty: 5) == null);
+        assert(await restocksNotifier.saveRestock() == null);
+        final salesNotifier = container.read(sales.salesProvider.notifier);
+        await salesNotifier.load('store-1', storeName: 'Toko Evan');
+        assert(await salesNotifier.addItem('p1', 5) == null);
+        assert(
+          await salesNotifier.checkout(
+                paid: 17500,
+                method: PayMethod.tunai,
+              ) ==
+              null,
+        );
+        expect((await db.getProduct('p1'))!.stock, 5);
+
+        final err = await env.notifier.syncAll();
+
+        expect(err, isNull, reason: 'sync backup tidak boleh error');
+        expect(saleAttempts, 1);
+        expect((await db.getProduct('p1'))!.stock, 5);
+        // Pull dokumen tidak mengubah stok lokal.
+        expect((await db.getProduct('p1'))!.dirty, 0);
+      },
+    );
+
     test(
       'REGRESI (+5 jadi +10): restock lalu syncAll -> stok tepat 5',
       () async {

@@ -371,45 +371,55 @@ class RestocksNotifier extends Notifier<RestocksState> {
   ) async {
     final dirty = await _db.dirtyRestocks(_storeId);
     for (final row in dirty) {
-      try {
-        // Baris voided: kirim pembatalan ke server, bukan POST ulang dokumen.
-        // 404 (restock belum pernah terkirim) = anggap sukses; 409 stok
-        // kurang di server = pesan jelas.
-        if (row.status == 'voided') {
-          try {
-            await _api.voidRestock(
-              accessToken: accessToken,
-              id: row.id,
-              reason: row.voidReason ?? 'dibatalkan',
-            );
-          } on DioException catch (e) {
-            if (e.response?.statusCode == 404) {
-              // Belum pernah terkirim: tidak ada yang perlu dibatalkan.
-            } else {
-              rethrow;
-            }
+      await pushSingleRestock(accessToken, row, onRowError);
+    }
+  }
+
+  /// Push SATU restock (dipakai sinkron kronologis lintas tipe).
+  /// Idempoten: 404 void = sukses, 409 = pesan per baris lalu lanjut.
+  Future<void> pushSingleRestock(
+    String accessToken,
+    Restock row,
+    void Function(String) onRowError,
+  ) async {
+    try {
+      // Baris voided: kirim pembatalan ke server, bukan POST ulang dokumen.
+      // 404 (restock belum pernah terkirim) = anggap sukses; 409 stok
+      // kurang di server = pesan jelas.
+      if (row.status == 'voided') {
+        try {
+          await _api.voidRestock(
+            accessToken: accessToken,
+            id: row.id,
+            reason: row.voidReason ?? 'dibatalkan',
+          );
+        } on DioException catch (e) {
+          if (e.response?.statusCode == 404) {
+            // Belum pernah terkirim: tidak ada yang perlu dibatalkan.
+          } else {
+            rethrow;
           }
-          await _db.markRestocksClean([row.id]);
-          continue;
         }
-        // Sinkron restock sekaligus sinkron produk: produk terkait di-push
-        // DULU (stok cloud ikut terkini), baru restock di-POST sekali.
-        // Bila ada produk gagal push (mis. barcode bentrok), restock tidak
-        // dipaksa terkirim — user perbaiki dulu di Kelola Produk.
-        final productError = await _pushMissingProducts(accessToken, row.id);
-        if (productError != null) {
-          onRowError(productError);
-          continue;
-        }
-        await _postRestock(accessToken, row.id);
         await _db.markRestocksClean([row.id]);
-      } on DioException catch (e) {
-        if (e.response?.statusCode == 409) {
-          onRowError(RestocksApi.friendlyError(e));
-          continue;
-        }
-        rethrow;
+        return;
       }
+      // Sinkron restock sekaligus sinkron produk: produk terkait di-push
+      // DULU (stok cloud ikut terkini), baru restock di-POST sekali.
+      // Bila ada produk gagal push (mis. barcode bentrok), restock tidak
+      // dipaksa terkirim — user perbaiki dulu di Kelola Produk.
+      final productError = await _pushMissingProducts(accessToken, row.id);
+      if (productError != null) {
+        onRowError(productError);
+        return;
+      }
+      await _postRestock(accessToken, row.id);
+      await _db.markRestocksClean([row.id]);
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 409) {
+        onRowError(RestocksApi.friendlyError(e));
+        return;
+      }
+      rethrow;
     }
   }
 

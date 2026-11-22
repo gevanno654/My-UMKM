@@ -29,10 +29,14 @@ class SyncAllState {
       );
 }
 
-/// Orkestrator sinkron global: push SEMUA dokumen dulu (produk → kasir →
-/// kulakan → opname), baru pull SEMUA. Pull hanya jalan setelah server
-/// menerima seluruh dokumen, sehingga stok lokal tidak pernah tertimpa
-/// angka server yang basi (akar bug restock +5 jadi +10).
+/// Orkestrator sinkron global = BACKUP satu arah (HP → cloud).
+/// Stok lokal otoritatif: sinkron tidak boleh mengubah stok aplikasi.
+/// - Push: katalog dulu, lalu SEMUA dokumen dirty dalam urutan kronologis
+///   dibuatnya (kulakan sebelum kasir bila dibuat duluan), sehingga stok
+///   cloud yang hanya bergerak via dokumen tidak pernah mendapat urutan
+///   terbalik (akar error "Stok tidak cukup di server").
+/// - Pull: hanya metadata katalog (nama/harga/foto/hapus/arsip) + riwayat
+///   dokumen. Stok lokal TIDAK PERNAH ditimpa angka server.
 class SyncAllNotifier extends Notifier<SyncAllState> {
   @override
   SyncAllState build() => const SyncAllState();
@@ -75,14 +79,38 @@ class SyncAllNotifier extends Notifier<SyncAllState> {
       await restocks.load(storeId);
       await adjustments.load(storeId);
 
-      // Fase push: produk dulu, lalu dokumen yang merujuknya.
+      // Fase push 1: katalog (nama/harga/foto/hapus). Stok TIDAK
+      // dikirim: body produk selalu stok 0, stok cloud hanya bergerak
+      // via dokumen di bawah.
       await products.pushCatalog(accessToken, (e) => firstError ??= e);
-      await sales.pushSales(accessToken, (e) => firstError ??= e);
-      await restocks.pushRestocks(accessToken, (e) => firstError ??= e);
-      await adjustments.pushAdjustments(
-        accessToken,
-        (e) => firstError ??= e,
-      );
+
+      // Fase push 2: dokumen dirty lintas tipe dalam urutan kronologis
+      // dibuatnya (createdAt), bukan per tipe. Restock yang dibuat sebelum
+      // sale di-push duluan, sehingga stok cloud cukup saat sale di-POST.
+      final db = ref.read(appDbProvider);
+      final docs = [
+        for (final r in await db.dirtyRestocks(storeId))
+          (createdAt: r.createdAt, push: () => restocks.pushSingleRestock(
+                accessToken,
+                r,
+                (e) => firstError ??= e,
+              )),
+        for (final s in await db.dirtySales(storeId))
+          (createdAt: s.createdAt, push: () => sales.pushSingleSale(
+                accessToken,
+                s,
+                (e) => firstError ??= e,
+              )),
+        for (final a in await db.dirtyAdjustments(storeId))
+          (createdAt: a.createdAt, push: () => adjustments.pushSingleAdjustment(
+                accessToken,
+                a,
+                (e) => firstError ??= e,
+              )),
+      ]..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+      for (final doc in docs) {
+        await doc.push();
+      }
 
       // Fase pull: server sudah punya semua dokumen.
       await products.pullCatalog(accessToken);

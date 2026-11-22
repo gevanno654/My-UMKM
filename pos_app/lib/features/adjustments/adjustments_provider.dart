@@ -240,38 +240,48 @@ class AdjustmentsNotifier extends Notifier<AdjustmentsState> {
   ) async {
     final dirty = await _db.dirtyAdjustments(_storeId);
     for (final row in dirty) {
-      try {
-        // Baris voided: kirim pembatalan ke server, bukan POST ulang dokumen.
-        // 404 (belum pernah terkirim) = anggap sukses; 409 = pesan jelas.
-        if (row.status == 'voided') {
-          try {
-            await _api.voidAdjustment(
-              accessToken: accessToken,
-              id: row.id,
-              reason: row.voidReason ?? 'dibatalkan',
-            );
-          } on DioException catch (e) {
-            if (e.response?.statusCode != 404) rethrow;
-          }
-          await _db.markAdjustmentsClean([row.id]);
-          continue;
+      await pushSingleAdjustment(accessToken, row, onRowError);
+    }
+  }
+
+  /// Push SATU adjustment (dipakai sinkron kronologis lintas tipe).
+  /// Idempoten: 404 void = sukses, 409 = pesan per baris lalu lanjut.
+  Future<void> pushSingleAdjustment(
+    String accessToken,
+    Adjustment row,
+    void Function(String) onRowError,
+  ) async {
+    try {
+      // Baris voided: kirim pembatalan ke server, bukan POST ulang dokumen.
+      // 404 (belum pernah terkirim) = anggap sukses; 409 = pesan jelas.
+      if (row.status == 'voided') {
+        try {
+          await _api.voidAdjustment(
+            accessToken: accessToken,
+            id: row.id,
+            reason: row.voidReason ?? 'dibatalkan',
+          );
+        } on DioException catch (e) {
+          if (e.response?.statusCode != 404) rethrow;
         }
-        // Sinkron opname sekaligus sinkron produk: produk terkait di-push
-        // DULU (stok cloud ikut terkini), baru adjustment di-POST sekali.
-        final productError = await _pushMissingProducts(accessToken, row.id);
-        if (productError != null) {
-          onRowError(productError);
-          continue;
-        }
-        await _postAdjustment(accessToken, row);
         await _db.markAdjustmentsClean([row.id]);
-      } on DioException catch (e) {
-        if (e.response?.statusCode == 409) {
-          onRowError(AdjustmentsApi.friendlyError(e));
-          continue;
-        }
-        rethrow;
+        return;
       }
+      // Sinkron opname sekaligus sinkron produk: produk terkait di-push
+      // DULU (stok cloud ikut terkini), baru adjustment di-POST sekali.
+      final productError = await _pushMissingProducts(accessToken, row.id);
+      if (productError != null) {
+        onRowError(productError);
+        return;
+      }
+      await _postAdjustment(accessToken, row);
+      await _db.markAdjustmentsClean([row.id]);
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 409) {
+        onRowError(AdjustmentsApi.friendlyError(e));
+        return;
+      }
+      rethrow;
     }
   }
 

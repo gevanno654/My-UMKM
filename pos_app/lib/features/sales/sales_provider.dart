@@ -265,34 +265,44 @@ class SalesNotifier extends Notifier<SalesState> {
   ) async {
     final dirty = await _db.dirtySales(_storeId);
     for (final row in dirty) {
-      try {
-        // Baris voided: kirim pembatalan ke server, bukan POST ulang.
-        // 404 (sale belum pernah terkirim) = anggap sukses.
-        if (row.status == 'voided') {
-          try {
-            await _api.voidSale(
-              accessToken: accessToken,
-              id: row.id,
-              reason: row.voidReason ?? 'dibatalkan',
-            );
-          } on DioException catch (e) {
-            if (e.response?.statusCode != 404) rethrow;
-          }
-          await _db.markSalesClean([row.id]);
-          continue;
+      await pushSingleSale(accessToken, row, onRowError);
+    }
+  }
+
+  /// Push SATU sale (dipakai sinkron kronologis lintas tipe).
+  /// Idempoten: 404 void = sukses, 409 = pesan per baris lalu lanjut.
+  Future<void> pushSingleSale(
+    String accessToken,
+    Sale row,
+    void Function(String) onRowError,
+  ) async {
+    try {
+      // Baris voided: kirim pembatalan ke server, bukan POST ulang.
+      // 404 (sale belum pernah terkirim) = anggap sukses.
+      if (row.status == 'voided') {
+        try {
+          await _api.voidSale(
+            accessToken: accessToken,
+            id: row.id,
+            reason: row.voidReason ?? 'dibatalkan',
+          );
+        } on DioException catch (e) {
+          if (e.response?.statusCode != 404) rethrow;
         }
-        // Sinkron kasir sekaligus sinkron produk: produk terkait di-push
-        // DULU (stok cloud ikut terkini), baru sale di-POST sekali.
-        await _pushMissingProducts(accessToken, row.id);
-        await _postSale(accessToken, row);
         await _db.markSalesClean([row.id]);
-      } on DioException catch (e) {
-        if (e.response?.statusCode == 409) {
-          onRowError(SalesApi.friendlyError(e));
-          continue;
-        }
-        rethrow;
+        return;
       }
+      // Sinkron kasir sekaligus sinkron produk: produk terkait di-push
+      // DULU (stok cloud ikut terkini), baru sale di-POST sekali.
+      await _pushMissingProducts(accessToken, row.id);
+      await _postSale(accessToken, row);
+      await _db.markSalesClean([row.id]);
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 409) {
+        onRowError(SalesApi.friendlyError(e));
+        return;
+      }
+      rethrow;
     }
   }
 

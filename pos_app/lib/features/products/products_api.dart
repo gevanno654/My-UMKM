@@ -87,13 +87,18 @@ class ProductsApi {
     );
   }
 
+  /// Body produk ke server: hanya field katalog + harga.
+  /// STOK TIDAK PERNAH DIKIRIM (selalu 0): server satu-satunya sumber
+  /// hitung stok (hanya berubah via dokumen restock/sale/adjustment),
+  /// sehingga push katalog tidak bisa mengacaukan stok cloud. Stok 0 =
+  /// baseline produk baru, bukan angka yang menimpa.
   Map<String, dynamic> _toServer(ProductModel p) => {
         'id': p.id,
         'name': p.name,
         'barcode': ProductModel.normalizeBarcode(p.barcode),
         'costPrice': p.costPrice,
         'sellPrice': p.sellPrice,
-        'stock': p.stock,
+        'stock': 0,
         'category': p.category,
       };
 
