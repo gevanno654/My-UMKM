@@ -1,13 +1,14 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/material.dart';import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../auth/auth_provider.dart';
 import '../auth/auth_state.dart';
+import '../adjustments/adjustments_provider.dart' as adj;
 import 'photo_store.dart';
+import 'product_model.dart';
 import 'products_provider.dart';
 
 /// Daftar produk: search (nama/barcode), filter chip Aktif/Arsip,
@@ -348,8 +349,7 @@ class ProductDetailScreen extends ConsumerWidget {
             },
           ),
         ],
-      ),
-      body: ListView(
+      ),      body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
           Center(
@@ -370,7 +370,7 @@ class ProductDetailScreen extends ConsumerWidget {
           ),
           ListTile(
             title: const Text('Stok'),
-            trailing: Text('${product.stock}'),
+            trailing: Text('Stok: ${product.stock}'),
           ),
           if (product.barcode != null)
             ListTile(
@@ -383,6 +383,19 @@ class ProductDetailScreen extends ConsumerWidget {
               trailing: Text(product.category),
             ),
           const SizedBox(height: 16),
+          if (!product.isArchived)
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                key: const Key('adjustButton'),
+                icon: const Icon(Icons.tune_outlined),
+                label: const Text('Sesuaikan stok (opname)'),
+                onPressed: () async {
+                  await _openAdjustDialog(context, ref, product);
+                },
+              ),
+            ),
+          if (!product.isArchived) const SizedBox(height: 12),
           Row(
             children: [
               Expanded(
@@ -444,6 +457,160 @@ class ProductDetailScreen extends ConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Dialog sesuaikan stok: hasil hitung fisik + alasan wajib.
+/// Sukses → tutup + snackbar; gagal → pesan tampil di dialog.
+Future<void> _openAdjustDialog(
+  BuildContext context,
+  WidgetRef ref,
+  ProductModel product,
+) async {
+  await showDialog<void>(
+    context: context,
+    builder: (dialogContext) => _AdjustDialog(
+      productId: product.id,
+      productName: product.name,
+      systemStock: product.stock,
+      onSave: (physicalStock, reason) => ref
+          .read(adj.adjustmentsProvider.notifier)
+          .adjustStock(
+            productId: product.id,
+            physicalStock: physicalStock,
+            reason: reason,
+          ),
+    ),
+  );
+  if (context.mounted) {
+    // Baca ulang produk agar stok di layar ikut angka baru.
+    await ref.read(productsProvider.notifier).refreshProduct(product.id);
+  }
+  if (context.mounted) {
+    // Snackbar hanya bila benar-benar tersimpan (stok berubah).
+    final updated = ref.read(productsProvider).products
+        .where((e) => e.id == product.id)
+        .firstOrNull;
+    if (updated != null && updated.stock != product.stock) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Stok disesuaikan.')),
+      );
+    }
+  }
+}
+
+class _AdjustDialog extends StatefulWidget {
+  const _AdjustDialog({
+    required this.productId,
+    required this.productName,
+    required this.systemStock,
+    required this.onSave,
+  });
+
+  final String productId;
+  final String productName;
+  final int systemStock;
+  final Future<String?> Function(int physicalStock, String reason) onSave;
+
+  @override
+  State<_AdjustDialog> createState() => _AdjustDialogState();
+}
+
+class _AdjustDialogState extends State<_AdjustDialog> {
+  late final TextEditingController _physical;
+  late final TextEditingController _reason;
+  String? _error;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _physical = TextEditingController(text: '${widget.systemStock}');
+    _reason = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _physical.dispose();
+    _reason.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Sesuaikan stok'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Stok sistem: ${widget.systemStock}'),
+          const SizedBox(height: 12),
+          TextField(
+            key: const Key('physicalField'),
+            controller: _physical,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(
+              labelText: 'Hasil hitung fisik',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            key: const Key('reasonField'),
+            controller: _reason,
+            maxLength: 200,
+            decoration: const InputDecoration(
+              labelText: 'Alasan (wajib)',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          if (_error != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                _error!,
+                key: const Key('adjustErrorText'),
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.error,
+                ),
+              ),
+            ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: _saving ? null : () => Navigator.pop(context),
+          child: const Text('Batal'),
+        ),
+        FilledButton(
+          key: const Key('saveAdjustButton'),
+          onPressed: _saving
+              ? null
+              : () async {
+                  setState(() {
+                    _saving = true;
+                    _error = null;
+                  });
+                  final parsed = int.tryParse(_physical.text.trim());
+                  final err = await widget.onSave(
+                    parsed ?? -1,
+                    _reason.text,
+                  );
+                  if (!context.mounted) return;
+                  if (err != null) {
+                    setState(() {
+                      _error = err;
+                      _saving = false;
+                    });
+                    return;
+                  }
+                  Navigator.pop(context);
+                },
+          child: const Text('Simpan'),
+        ),
+      ],
     );
   }
 }

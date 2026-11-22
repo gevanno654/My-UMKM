@@ -361,4 +361,19 @@ class ProductsNotifier extends Notifier<ProductsState> {
     }
     state = state.copyWith(products: rows.map((e) => e.toModel()).toList());
   }
+
+  /// Baca ulang satu produk dari DB (future biasa, tanpa stream) lalu
+  /// ganti barisnya di state. Dipakai setelah opname agar stok di layar
+  /// langsung ikut angka baru tanpa menunggu stream watch.
+  Future<void> refreshProduct(String id) async {
+    final row = await _db.getProduct(id);
+    if (row == null) return;
+    final model = row.toModel();
+    state = state.copyWith(
+      products: [
+        for (final p in state.products)
+          if (p.id == id) model else p,
+      ],
+    );
+  }
 }
