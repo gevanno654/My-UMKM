@@ -182,7 +182,8 @@ void main() {
       await pumpAt(tester, container, '/adjustments');
 
       expect(find.textContaining('selip'), findsOneWidget);
-      expect(find.byKey(const Key('syncButton')), findsOneWidget);
+      // Sync per halaman dihapus: sinkron hanya via Sinkron Semua di Home.
+      expect(find.byKey(const Key('syncButton')), findsNothing);
 
       await tester.tap(find.byKey(const Key('void-a1')));
       await tester.pump();

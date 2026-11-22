@@ -77,15 +77,6 @@ class _ProductsListScreenState extends ConsumerState<ProductsListScreen> {
     super.dispose();
   }
 
-  Future<void> _sync() async {
-    final session = ref.read(secureSessionProvider);
-    final tokens = await session.readTokens();
-    if (!mounted) return;
-    await ref
-        .read(productsProvider.notifier)
-        .syncNow(accessToken: tokens.accessToken ?? '');
-  }
-
   Future<void> _openScan() async {
     if (!mounted) return;
     final result = await context.push<String>('/products/scan');
@@ -118,13 +109,6 @@ class _ProductsListScreenState extends ConsumerState<ProductsListScreen> {
     }
   }
 
-  String _syncLabel(SyncStatus status) => switch (status) {
-        SyncStatus.syncing => 'Menyinkronkan…',
-        SyncStatus.offline => 'Offline',
-        SyncStatus.error => 'Sinkron gagal',
-        SyncStatus.idle => 'Sinkron',
-      };
-
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(productsProvider);
@@ -132,19 +116,6 @@ class _ProductsListScreenState extends ConsumerState<ProductsListScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Produk'),
-        actions: [
-          TextButton.icon(
-            key: const Key('syncButton'),
-            onPressed: state.isLoading ? null : _sync,
-            icon: state.syncStatus == SyncStatus.syncing
-                ? const SizedBox.square(
-                    dimension: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.sync),
-            label: Text(_syncLabel(state.syncStatus)),
-          ),
-        ],
       ),
       floatingActionButton: FloatingActionButton(
         key: const Key('addButton'),

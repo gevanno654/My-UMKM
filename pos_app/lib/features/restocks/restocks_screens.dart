@@ -37,28 +37,12 @@ class _RestocksListScreenState extends ConsumerState<RestocksListScreen> {
     await ref.read(restocksProvider.notifier).load(storeId);
   }
 
-  Future<void> _sync() async {
-    final session = ref.read(secureSessionProvider);
-    final tokens = await session.readTokens();
-    if (!mounted) return;
-    await ref
-        .read(restocksProvider.notifier)
-        .syncNow(accessToken: tokens.accessToken ?? '');
-  }
-
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(restocksProvider);
     return Scaffold(
       appBar: AppBar(
         title: const Text('Restock'),
-        actions: [
-          IconButton(
-            tooltip: 'Sinkron',
-            icon: const Icon(Icons.sync_outlined),
-            onPressed: _sync,
-          ),
-        ],
       ),
       floatingActionButton: FloatingActionButton(
         key: const Key('kulakanButton'),

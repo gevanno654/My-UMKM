@@ -125,15 +125,6 @@ class _KasirScreenState extends ConsumerState<KasirScreen> {
     await _onSearchChanged(result);
   }
 
-  Future<void> _sync() async {
-    final session = ref.read(secureSessionProvider);
-    final tokens = await session.readTokens();
-    if (!mounted) return;
-    await ref
-        .read(salesProvider.notifier)
-        .syncNow(accessToken: tokens.accessToken ?? '');
-  }
-
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(salesProvider);
@@ -146,11 +137,6 @@ class _KasirScreenState extends ConsumerState<KasirScreen> {
             tooltip: 'Riwayat',
             icon: const Icon(Icons.receipt_long_outlined),
             onPressed: () => context.push('/sales/history'),
-          ),
-          IconButton(
-            tooltip: 'Sinkron',
-            icon: const Icon(Icons.sync_outlined),
-            onPressed: _sync,
           ),
         ],
       ),
@@ -507,15 +493,6 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
     await ref.read(salesProvider.notifier).load(storeId, storeName: storeName);
   }
 
-  Future<void> _sync() async {
-    final session = ref.read(secureSessionProvider);
-    final tokens = await session.readTokens();
-    if (!mounted) return;
-    await ref
-        .read(salesProvider.notifier)
-        .syncNow(accessToken: tokens.accessToken ?? '');
-  }
-
   Future<void> _confirmVoid(String id, String number) async {
     final reason = TextEditingController();
     final ok = await showDialog<bool>(
@@ -568,13 +545,6 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Riwayat Transaksi'),
-        actions: [
-          IconButton(
-            tooltip: 'Sinkron',
-            icon: const Icon(Icons.sync_outlined),
-            onPressed: _sync,
-          ),
-        ],
       ),
       body: state.history.isEmpty
           ? const Center(child: Text('Belum ada transaksi'))

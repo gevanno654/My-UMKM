@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../auth/auth_provider.dart';
 import '../sales/sales_screens.dart' show resolveStore;
 import 'adjustments_provider.dart';
 
@@ -29,15 +28,6 @@ class _AdjustmentsListScreenState extends ConsumerState<AdjustmentsListScreen> {
     final (storeId, _) = await resolveStore(ref);
     if (!mounted) return;
     await ref.read(adjustmentsProvider.notifier).load(storeId);
-  }
-
-  Future<void> _sync() async {
-    final session = ref.read(secureSessionProvider);
-    final tokens = await session.readTokens();
-    if (!mounted) return;
-    await ref
-        .read(adjustmentsProvider.notifier)
-        .syncNow(accessToken: tokens.accessToken ?? '');
   }
 
   Future<void> _confirmVoid(String id, String name) async {
@@ -93,14 +83,6 @@ class _AdjustmentsListScreenState extends ConsumerState<AdjustmentsListScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Opname'),
-        actions: [
-          IconButton(
-            key: const Key('syncButton'),
-            tooltip: 'Sinkron',
-            icon: const Icon(Icons.sync_outlined),
-            onPressed: _sync,
-          ),
-        ],
       ),
       body: Column(
         children: [

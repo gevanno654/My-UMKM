@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:pos_app/core/sync/sync_all_provider.dart';
+
 import 'auth_provider.dart';
 import 'auth_state.dart';
 
@@ -57,6 +59,40 @@ class HomePlaceholder extends ConsumerWidget {
               key: const Key('productsButton'),
               onPressed: () => context.push('/products'),
               child: const Text('Kelola Produk'),
+            ),
+            const SizedBox(height: 8),
+            Consumer(
+              builder: (context, ref, _) {
+                final sync = ref.watch(syncAllProvider);
+                final label = switch (sync.status) {
+                  SyncStatus.syncing => 'Menyinkron...',
+                  SyncStatus.offline => 'Offline — coba lagi',
+                  SyncStatus.error => 'Gagal sinkron',
+                  SyncStatus.idle => 'Sinkron Semua',
+                };
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ElevatedButton(
+                      key: const Key('syncAllButton'),
+                      onPressed: sync.status == SyncStatus.syncing
+                          ? null
+                          : () =>
+                                ref.read(syncAllProvider.notifier).syncAll(),
+                      child: Text(label),
+                    ),
+                    if (sync.lastError != null)
+                      Padding(
+                        key: const Key('syncAllStatus'),
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Text(
+                          sync.lastError!,
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                  ],
+                );
+              },
             ),
           ],
         ),
