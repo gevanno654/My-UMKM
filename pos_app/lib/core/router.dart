@@ -15,7 +15,6 @@ import '../features/products/scan_screen.dart';
 import '../features/restocks/restocks_screens.dart';
 import '../features/adjustments/adjustments_screens.dart';
 import '../features/reports/reports_screens.dart';
-import '../features/sales/printer_setup_screen.dart';
 import '../features/sales/sales_screens.dart';
 
 /// Semua route fondasi + produk + kasir + restock + laporan.
@@ -35,7 +34,6 @@ const appRoutePaths = <String>[
   '/sales/pay',
   '/sales/receipt',
   '/sales/history',
-  '/settings/printer',
   '/restocks',
   '/restocks/new',
   '/restocks/:id',
@@ -155,10 +153,6 @@ GoRouter buildRouter({
       GoRoute(
         path: '/sales/history',
         builder: (context, state) => const HistoryScreen(),
-      ),
-      GoRoute(
-        path: '/settings/printer',
-        builder: (context, state) => const PrinterSetupScreen(),
       ),
       GoRoute(
         path: '/restocks',

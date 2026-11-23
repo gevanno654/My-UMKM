@@ -148,10 +148,9 @@ void main() {
       '/restocks/:id',
       '/adjustments',
       '/reports',
-      '/settings/printer',
     ];
 
-    test('memetakan 21 route', () {
+    test('memetakan 20 route', () {
       expect(appRoutePaths, unorderedEquals(expectedPaths));
     });
 

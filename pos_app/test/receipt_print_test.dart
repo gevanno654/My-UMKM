@@ -2,15 +2,14 @@ import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:go_router/go_router.dart';
 import 'package:pos_app/core/db/app_db.dart';
 import 'package:pos_app/core/session/secure_session.dart';
 import 'package:pos_app/features/auth/auth_provider.dart';
 import 'package:pos_app/features/auth/auth_state.dart';
 import 'package:pos_app/features/sales/printer_service.dart';
-import 'package:pos_app/features/sales/printer_setup_screen.dart';
 import 'package:pos_app/features/sales/sales_provider.dart';
 import 'package:pos_app/features/sales/sales_screens.dart';
+import 'package:print_bluetooth_thermal/print_bluetooth_thermal.dart';
 
 /// Auth state palsu: langsung terautentikasi.
 class _FakeAuthNotifier extends AuthNotifier {
@@ -127,30 +126,29 @@ class _FakeFailingAdapter extends PrinterAdapter {
   Future<bool> connect(String mac) async => false;
 }
 
+/// Adapter paired berisi RPP02N; connect ok agar alur pilih→simpan→cetak jalan.
+class _FakePairedAdapter extends _FakeFailingAdapter {
+  @override
+  Future<List<BluetoothInfo>> paired() async => [
+    BluetoothInfo(name: 'RPP02N', macAdress: 'DC:0D:51:4B:D5:BC'),
+  ];
+
+  @override
+  Future<bool> connect(String mac) async => true;
+
+  @override
+  Future<bool> writeBytes(List<int> bytes) async => true;
+}
+
 Future<void> pumpReceipt(
   WidgetTester tester,
   ProviderContainer container, {
   PrinterService? printerService,
 }) async {
-  final router = GoRouter(
-    initialLocation: '/receipt',
-    routes: [
-      GoRoute(
-        path: '/receipt',
-        builder: (context, state) =>
-            ReceiptScreen(printerService: printerService),
-      ),
-      GoRoute(
-        path: '/settings/printer',
-        builder: (context, state) => const PrinterSetupScreen(),
-      ),
-    ],
-  );
-  addTearDown(router.dispose);
   await tester.pumpWidget(
     UncontrolledProviderScope(
       container: container,
-      child: MaterialApp.router(routerConfig: router),
+      child: MaterialApp(home: ReceiptScreen(printerService: printerService)),
     ),
   );
   await tester.runAsync(() async {
@@ -169,35 +167,57 @@ void main() {
       expect(find.text('Transaksi Baru'), findsOneWidget);
     });
 
-    testWidgets('ketuk Cetak tanpa printer → snackbar + jalan pintas siapkan', (
+    testWidgets('ketuk Cetak tanpa printer tersimpan buka dialog pilih', (
       tester,
     ) async {
       final container = await makeReceipt(tester);
       final svc = PrinterService(
         storage: _FakeFailingStorage(),
-        adapter: _FakeFailingAdapter(),
+        adapter: _FakePairedAdapter(),
       );
       await pumpReceipt(tester, container, printerService: svc);
       await tester.tap(find.text('Cetak Struk'));
+      await tester.pump();
       await tester.runAsync(() async {
         await Future<void>.delayed(const Duration(seconds: 2));
       });
       await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+      // Dialog pilih muncul dengan daftar paired; tanpa itu = regresi.
+      expect(find.text('Pilih Printer'), findsOneWidget);
+      expect(find.text('RPP02N'), findsOneWidget);
+    });
+
+    testWidgets('pilih printer di dialog simpan MAC lalu cetak', (tester) async {
+      final container = await makeReceipt(tester);
+      final storage = _FakeFailingStorage();
+      final svc = PrinterService(
+        storage: storage,
+        adapter: _FakePairedAdapter(),
+      );
+      await pumpReceipt(tester, container, printerService: svc);
+      await tester.tap(find.text('Cetak Struk'));
+      await tester.pump();
+      await tester.runAsync(() async {
+        await Future<void>.delayed(const Duration(seconds: 2));
+      });
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+      await tester.tap(find.text('RPP02N'));
+      await tester.runAsync(() async {
+        await Future<void>.delayed(const Duration(seconds: 2));
+      });
+      await tester.pump();
+      // MAC tersimpan untuk cetak berikutnya; hasil cetak tergantung adapter.
+      expect(await svc.savedMac(), 'DC:0D:51:4B:D5:BC');
       expect(find.byType(SnackBar), findsOneWidget);
-      expect(find.text('Belum ada printer. Siapkan dulu.'), findsOneWidget);
-      // SnackBarAction ada dan berlabel benar (navigasi /settings/printer
-      // terdaftar di pumpReceipt; tap action rawan hit-test di widget test).
-      final actions = tester
-          .widgetList<SnackBarAction>(find.byType(SnackBarAction))
-          .toList();
-      expect(actions.map((a) => a.label), contains('Siapkan Printer'));
     });
 
     testWidgets('gagal connect tampilkan snackbar, tidak crash', (tester) async {
       final container = await makeReceipt(tester);
       final storage = _FakeFailingStorage();
       final svc = PrinterService(storage: storage, adapter: _FakeFailingAdapter());
-      await svc.savePrinter(name: 'RPP02N', mac: '00:11:22:33:44:55');
+      await svc.saveMac('00:11:22:33:44:55');
       await pumpReceipt(tester, container, printerService: svc);
       await tester.tap(find.text('Cetak Struk'));
       await tester.runAsync(() async {

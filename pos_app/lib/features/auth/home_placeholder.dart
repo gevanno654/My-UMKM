@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 
 import 'package:pos_app/core/sync/sync_all_provider.dart';
 
-import '../sales/printer_service.dart';
 import 'auth_provider.dart';
 import 'auth_state.dart';
 
@@ -67,8 +66,6 @@ class HomePlaceholder extends ConsumerWidget {
               onPressed: () => context.push('/reports'),
               child: const Text('Laporan'),
             ),
-            const SizedBox(height: 8),
-            const _PrinterSetupEntry(),
             const SizedBox(height: 8),
             Consumer(
               builder: (context, ref, _) {
@@ -133,38 +130,5 @@ class HomePlaceholder extends ConsumerWidget {
     if (ok == true) {
       await ref.read(authProvider.notifier).logout();
     }
-  }
-}
-
-/// Entri Printer Struk di home: tombol + status nama tersimpan.
-///
-/// Stateless + FutureBuilder agar tidak perlu provider baru untuk satu label.
-class _PrinterSetupEntry extends StatelessWidget {
-  const _PrinterSetupEntry();
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        ElevatedButton(
-          key: const Key('printerSetupButton'),
-          onPressed: () => context.push('/settings/printer'),
-          child: const Text('Printer Struk'),
-        ),
-        FutureBuilder<(String, String)?>(
-          future: PrinterService().savedPrinter(),
-          builder: (context, snap) {
-            final saved = snap.data;
-            final label = !snap.hasData
-                ? 'Belum disiapkan'
-                : saved == null
-                ? 'Belum disiapkan'
-                : 'Tersimpan: ${saved.$1}';
-            return Text(key: const Key('printerSetupStatus'), label);
-          },
-        ),
-      ],
-    );
   }
 }
