@@ -61,6 +61,12 @@ class HomePlaceholder extends ConsumerWidget {
               child: const Text('Kelola Produk'),
             ),
             const SizedBox(height: 8),
+            ElevatedButton(
+              key: const Key('reportsButton'),
+              onPressed: () => context.push('/reports'),
+              child: const Text('Laporan'),
+            ),
+            const SizedBox(height: 8),
             Consumer(
               builder: (context, ref, _) {
                 final sync = ref.watch(syncAllProvider);

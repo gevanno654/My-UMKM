@@ -14,9 +14,10 @@ import '../features/products/products_screens.dart';
 import '../features/products/scan_screen.dart';
 import '../features/restocks/restocks_screens.dart';
 import '../features/adjustments/adjustments_screens.dart';
+import '../features/reports/reports_screens.dart';
 import '../features/sales/sales_screens.dart';
 
-/// Semua route fondasi + produk + kasir + restock.
+/// Semua route fondasi + produk + kasir + restock + laporan.
 const appRoutePaths = <String>[
   '/splash',
   '/login',
@@ -37,6 +38,7 @@ const appRoutePaths = <String>[
   '/restocks/new',
   '/restocks/:id',
   '/adjustments',
+  '/reports',
 ];
 
 /// Aturan gate auth murni (tanpa I/O) agar mudah diuji:
@@ -169,6 +171,10 @@ GoRouter buildRouter({
       GoRoute(
         path: '/adjustments',
         builder: (context, state) => const AdjustmentsListScreen(),
+      ),
+      GoRoute(
+        path: '/reports',
+        builder: (context, state) => const ReportsScreen(),
       ),
     ],
   );

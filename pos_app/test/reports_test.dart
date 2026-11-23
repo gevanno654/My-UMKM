@@ -4,8 +4,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:pos_app/core/db/app_db.dart';
 import 'package:pos_app/features/auth/auth_provider.dart';
 import 'package:pos_app/features/reports/reports_provider.dart';
-import 'package:pos_app/features/sales/sales_provider.dart'
-    as sales_feature;
 
 Future<({ReportsNotifier notifier, AppDb db})> makeReports({
   DateTime? now,

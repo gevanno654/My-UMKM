@@ -147,9 +147,10 @@ void main() {
       '/restocks/new',
       '/restocks/:id',
       '/adjustments',
+      '/reports',
     ];
 
-    test('memetakan 19 route', () {
+    test('memetakan 20 route', () {
       expect(appRoutePaths, unorderedEquals(expectedPaths));
     });
 
