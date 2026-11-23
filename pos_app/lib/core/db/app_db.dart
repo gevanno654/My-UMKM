@@ -86,13 +86,16 @@ class Sales extends Table {
   ];
 }
 
-/// Baris item transaksi: snapshot nama + harga saat jual.
+/// Baris item transaksi: snapshot nama + harga jual + harga beli saat jual.
+/// `costPrice` = snapshot harga beli katalog saat checkout (laba = jual−beli).
+/// Item manual tanpa produk: costPrice 0 → laba = harga × qty.
 class SaleItems extends Table {
   TextColumn get id => text()();
   TextColumn get saleId => text()();
   TextColumn get productId => text().nullable()();
   TextColumn get name => text()();
   IntColumn get price => integer()();
+  IntColumn get costPrice => integer().withDefault(const Constant(0))();
   IntColumn get qty => integer()();
   IntColumn get subtotal => integer()();
 
@@ -184,7 +187,7 @@ class AppDb extends _$AppDb {
   static AppDb openMemory() => AppDb(openMemoryDb());
 
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 6;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -210,6 +213,10 @@ class AppDb extends _$AppDb {
       // v4 → v5: tambah tabel penyesuaian opname (adjustments).
       if (from <= 4) {
         await m.createTable(adjustments);
+      }
+      // v5 → v6: snapshot harga beli per item jual (laba akurat permanen).
+      if (from <= 5) {
+        await m.addColumn(saleItems, saleItems.costPrice);
       }
     },
   );

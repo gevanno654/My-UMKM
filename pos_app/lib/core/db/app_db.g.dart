@@ -2111,6 +2111,18 @@ class $SaleItemsTable extends SaleItems
     type: DriftSqlType.int,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _costPriceMeta = const VerificationMeta(
+    'costPrice',
+  );
+  @override
+  late final GeneratedColumn<int> costPrice = GeneratedColumn<int>(
+    'cost_price',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const CustomExpression('0'),
+  );
   static const VerificationMeta _qtyMeta = const VerificationMeta('qty');
   @override
   late final GeneratedColumn<int> qty = GeneratedColumn<int>(
@@ -2138,6 +2150,7 @@ class $SaleItemsTable extends SaleItems
     productId,
     name,
     price,
+    costPrice,
     qty,
     subtotal,
   ];
@@ -2188,6 +2201,12 @@ class $SaleItemsTable extends SaleItems
     } else if (isInserting) {
       context.missing(_priceMeta);
     }
+    if (data.containsKey('cost_price')) {
+      context.handle(
+        _costPriceMeta,
+        costPrice.isAcceptableOrUnknown(data['cost_price']!, _costPriceMeta),
+      );
+    }
     if (data.containsKey('qty')) {
       context.handle(
         _qtyMeta,
@@ -2233,6 +2252,10 @@ class $SaleItemsTable extends SaleItems
         DriftSqlType.int,
         data['${effectivePrefix}price'],
       )!,
+      costPrice: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}cost_price'],
+      )!,
       qty: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}qty'],
@@ -2256,6 +2279,7 @@ class SaleItem extends DataClass implements Insertable<SaleItem> {
   final String? productId;
   final String name;
   final int price;
+  final int costPrice;
   final int qty;
   final int subtotal;
   const SaleItem({
@@ -2264,6 +2288,7 @@ class SaleItem extends DataClass implements Insertable<SaleItem> {
     this.productId,
     required this.name,
     required this.price,
+    this.costPrice = 0,
     required this.qty,
     required this.subtotal,
   });
@@ -2277,6 +2302,7 @@ class SaleItem extends DataClass implements Insertable<SaleItem> {
     }
     map['name'] = Variable<String>(name);
     map['price'] = Variable<int>(price);
+    map['cost_price'] = Variable<int>(costPrice);
     map['qty'] = Variable<int>(qty);
     map['subtotal'] = Variable<int>(subtotal);
     return map;
@@ -2291,6 +2317,7 @@ class SaleItem extends DataClass implements Insertable<SaleItem> {
           : Value(productId),
       name: Value(name),
       price: Value(price),
+      costPrice: Value(costPrice),
       qty: Value(qty),
       subtotal: Value(subtotal),
     );
@@ -2307,6 +2334,7 @@ class SaleItem extends DataClass implements Insertable<SaleItem> {
       productId: serializer.fromJson<String?>(json['productId']),
       name: serializer.fromJson<String>(json['name']),
       price: serializer.fromJson<int>(json['price']),
+      costPrice: serializer.fromJson<int>(json['costPrice'] ?? 0),
       qty: serializer.fromJson<int>(json['qty']),
       subtotal: serializer.fromJson<int>(json['subtotal']),
     );
@@ -2320,6 +2348,7 @@ class SaleItem extends DataClass implements Insertable<SaleItem> {
       'productId': serializer.toJson<String?>(productId),
       'name': serializer.toJson<String>(name),
       'price': serializer.toJson<int>(price),
+      'costPrice': serializer.toJson<int>(costPrice),
       'qty': serializer.toJson<int>(qty),
       'subtotal': serializer.toJson<int>(subtotal),
     };
@@ -2331,6 +2360,7 @@ class SaleItem extends DataClass implements Insertable<SaleItem> {
     Value<String?> productId = const Value.absent(),
     String? name,
     int? price,
+    int? costPrice,
     int? qty,
     int? subtotal,
   }) => SaleItem(
@@ -2339,6 +2369,7 @@ class SaleItem extends DataClass implements Insertable<SaleItem> {
     productId: productId.present ? productId.value : this.productId,
     name: name ?? this.name,
     price: price ?? this.price,
+    costPrice: costPrice ?? this.costPrice,
     qty: qty ?? this.qty,
     subtotal: subtotal ?? this.subtotal,
   );
@@ -2349,6 +2380,9 @@ class SaleItem extends DataClass implements Insertable<SaleItem> {
       productId: data.productId.present ? data.productId.value : this.productId,
       name: data.name.present ? data.name.value : this.name,
       price: data.price.present ? data.price.value : this.price,
+      costPrice: data.costPrice.present
+          ? data.costPrice.value
+          : this.costPrice,
       qty: data.qty.present ? data.qty.value : this.qty,
       subtotal: data.subtotal.present ? data.subtotal.value : this.subtotal,
     );
@@ -2362,6 +2396,7 @@ class SaleItem extends DataClass implements Insertable<SaleItem> {
           ..write('productId: $productId, ')
           ..write('name: $name, ')
           ..write('price: $price, ')
+          ..write('costPrice: $costPrice, ')
           ..write('qty: $qty, ')
           ..write('subtotal: $subtotal')
           ..write(')'))
@@ -2369,8 +2404,16 @@ class SaleItem extends DataClass implements Insertable<SaleItem> {
   }
 
   @override
-  int get hashCode =>
-      Object.hash(id, saleId, productId, name, price, qty, subtotal);
+  int get hashCode => Object.hash(
+    id,
+    saleId,
+    productId,
+    name,
+    price,
+    costPrice,
+    qty,
+    subtotal,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -2380,6 +2423,7 @@ class SaleItem extends DataClass implements Insertable<SaleItem> {
           other.productId == this.productId &&
           other.name == this.name &&
           other.price == this.price &&
+          other.costPrice == this.costPrice &&
           other.qty == this.qty &&
           other.subtotal == this.subtotal);
 }
@@ -2390,6 +2434,7 @@ class SaleItemsCompanion extends UpdateCompanion<SaleItem> {
   final Value<String?> productId;
   final Value<String> name;
   final Value<int> price;
+  final Value<int> costPrice;
   final Value<int> qty;
   final Value<int> subtotal;
   final Value<int> rowid;
@@ -2399,6 +2444,7 @@ class SaleItemsCompanion extends UpdateCompanion<SaleItem> {
     this.productId = const Value.absent(),
     this.name = const Value.absent(),
     this.price = const Value.absent(),
+    this.costPrice = const Value.absent(),
     this.qty = const Value.absent(),
     this.subtotal = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -2409,6 +2455,7 @@ class SaleItemsCompanion extends UpdateCompanion<SaleItem> {
     this.productId = const Value.absent(),
     required String name,
     required int price,
+    this.costPrice = const Value.absent(),
     required int qty,
     required int subtotal,
     this.rowid = const Value.absent(),
@@ -2424,6 +2471,7 @@ class SaleItemsCompanion extends UpdateCompanion<SaleItem> {
     Expression<String>? productId,
     Expression<String>? name,
     Expression<int>? price,
+    Expression<int>? costPrice,
     Expression<int>? qty,
     Expression<int>? subtotal,
     Expression<int>? rowid,
@@ -2434,6 +2482,7 @@ class SaleItemsCompanion extends UpdateCompanion<SaleItem> {
       if (productId != null) 'product_id': productId,
       if (name != null) 'name': name,
       if (price != null) 'price': price,
+      if (costPrice != null) 'cost_price': costPrice,
       if (qty != null) 'qty': qty,
       if (subtotal != null) 'subtotal': subtotal,
       if (rowid != null) 'rowid': rowid,
@@ -2446,6 +2495,7 @@ class SaleItemsCompanion extends UpdateCompanion<SaleItem> {
     Value<String?>? productId,
     Value<String>? name,
     Value<int>? price,
+    Value<int>? costPrice,
     Value<int>? qty,
     Value<int>? subtotal,
     Value<int>? rowid,
@@ -2456,6 +2506,7 @@ class SaleItemsCompanion extends UpdateCompanion<SaleItem> {
       productId: productId ?? this.productId,
       name: name ?? this.name,
       price: price ?? this.price,
+      costPrice: costPrice ?? this.costPrice,
       qty: qty ?? this.qty,
       subtotal: subtotal ?? this.subtotal,
       rowid: rowid ?? this.rowid,
@@ -2479,6 +2530,9 @@ class SaleItemsCompanion extends UpdateCompanion<SaleItem> {
     }
     if (price.present) {
       map['price'] = Variable<int>(price.value);
+    }
+    if (costPrice.present) {
+      map['cost_price'] = Variable<int>(costPrice.value);
     }
     if (qty.present) {
       map['qty'] = Variable<int>(qty.value);

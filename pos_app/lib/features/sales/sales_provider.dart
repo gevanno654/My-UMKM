@@ -159,6 +159,7 @@ class SalesNotifier extends Notifier<SalesState> {
           productId: Value(product.id),
           name: product.name,
           price: product.sellPrice,
+          costPrice: Value(product.costPrice),
           qty: line.qty,
           subtotal: subtotal,
         ),
@@ -320,6 +321,7 @@ class SalesNotifier extends Notifier<SalesState> {
               productId: i.productId,
               name: i.name,
               price: i.price,
+              costPrice: i.costPrice,
               qty: i.qty,
             ),
           )
@@ -386,6 +388,7 @@ class SalesNotifier extends Notifier<SalesState> {
                   productId: Value(i.productId),
                   name: i.name,
                   price: i.price,
+                  costPrice: Value(i.costPrice),
                   qty: i.qty,
                   subtotal: i.subtotal,
                 ),

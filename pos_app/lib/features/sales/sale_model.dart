@@ -3,13 +3,14 @@ import '../../core/db/app_db.dart';
 /// Metode pembayaran kasir v1.
 enum PayMethod { tunai, qris, transfer }
 
-/// Item transaksi: snapshot nama + harga saat jual.
+/// Item transaksi: snapshot nama + harga jual + harga beli saat jual.
 class SaleItemModel {
   const SaleItemModel({
     required this.id,
     required this.productId,
     required this.name,
     required this.price,
+    this.costPrice = 0,
     required this.qty,
   });
 
@@ -17,9 +18,15 @@ class SaleItemModel {
   final String? productId;
   final String name;
   final int price;
+
+  /// Snapshot harga beli katalog saat checkout (0 = item manual/tak dikenal).
+  final int costPrice;
   final int qty;
 
   int get subtotal => price * qty;
+
+  /// Laba kotor item: (jual − beli) × qty.
+  int get profit => (price - costPrice) * qty;
 }
 
 /// Transaksi penjualan (domain, bebas Drift kecuali konversi).
@@ -100,6 +107,7 @@ extension SaleRowX on Sale {
             productId: r.productId,
             name: r.name,
             price: r.price,
+            costPrice: r.costPrice,
             qty: r.qty,
           ),
         )

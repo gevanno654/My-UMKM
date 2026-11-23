@@ -217,6 +217,25 @@ void main() {
       expect(env.notifier.state.history.first.change, 0);
     });
 
+    test('checkout menyimpan snapshot harga beli per item', () async {
+      final env = await makeSales();
+      await env.notifier.addItem('p1', 2);
+
+      final error = await env.notifier.checkout(
+        paid: 7000,
+        method: PayMethod.tunai,
+      );
+
+      expect(error, isNull);
+      final items = await env.db.saleItemsOf(
+        env.notifier.state.history.first.id,
+      );
+      expect(items.single.costPrice, 2500);
+      final model = env.notifier.state.history.first.items.single;
+      expect(model.costPrice, 2500);
+      expect(model.profit, 2000); // (3500-2500)*2
+    });
+
     test('produk dihapus sebelum bayar -> diblokir', () async {
       final env = await makeSales();
       await env.notifier.addItem('p1', 1);

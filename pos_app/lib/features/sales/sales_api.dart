@@ -80,6 +80,7 @@ class SalesApi {
                 'name': i.name,
                 'price': i.price,
               },
+              if (i.productId != null) 'costPrice': i.costPrice,
               'qty': i.qty,
             })
             .toList(),
@@ -113,6 +114,7 @@ class SalesApi {
             productId: e['productId'] as String?,
             name: e['name'] as String,
             price: (e['price'] as num).toInt(),
+            costPrice: (e['costPrice'] as num?)?.toInt() ?? 0,
             qty: (e['qty'] as num).toInt(),
           ),
         )
