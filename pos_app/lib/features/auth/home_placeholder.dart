@@ -67,6 +67,12 @@ class HomePlaceholder extends ConsumerWidget {
               child: const Text('Laporan'),
             ),
             const SizedBox(height: 8),
+            ElevatedButton(
+              key: const Key('printerSetupButton'),
+              onPressed: () => context.push('/settings/printer'),
+              child: const Text('Printer Struk'),
+            ),
+            const SizedBox(height: 8),
             Consumer(
               builder: (context, ref, _) {
                 final sync = ref.watch(syncAllProvider);

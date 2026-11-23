@@ -1,3 +1,4 @@
+import 'package:permission_handler/permission_handler.dart' as ph;
 import 'package:print_bluetooth_thermal/print_bluetooth_thermal.dart';
 
 import '../../core/session/secure_session.dart';
@@ -15,6 +16,13 @@ class PrinterException implements Exception {
 /// Timeout tiap panggil native: plugin menggantung (tanpa result) bila
 /// izin BLUETOOTH_CONNECT ditolak — tanpa ini UI diam selamanya.
 const _nativeTimeout = Duration(seconds: 15);
+
+/// Hasil minta izin Bluetooth runtime.
+enum PrinterPermission { granted, denied, permanentlyDenied }
+
+/// Dibutuhkan saat izin belum granted TAPI user menolak permanen:
+/// arahkan ke layar siapkan (ada tombol Buka Pengaturan).
+class PrinterNeedsSetupException implements Exception {}
 
 /// Kunci MAC printer tersimpan (per-HP, tidak ikut sinkron).
 const printerMacKey = 'printer_mac';
@@ -77,6 +85,18 @@ class PrinterService {
   /// Daftar printer yang sudah di-pair di HP.
   Future<List<BluetoothInfo>> pairedPrinters() => _adapter.paired();
 
+  /// Minta izin Bluetooth resmi via popup sistem.
+  /// denied → boleh diminta lagi nanti; permanentlyDenied → Buka Pengaturan.
+  Future<PrinterPermission> requestPermission() async {
+    final s = await ph.Permission.bluetoothConnect.request();
+    if (s.isGranted || s.isLimited) return PrinterPermission.granted;
+    if (s.isPermanentlyDenied) return PrinterPermission.permanentlyDenied;
+    return PrinterPermission.denied;
+  }
+
+  /// Buka halaman Pengaturan aplikasi (untuk izin yang ditolak permanen).
+  Future<void> openSettings() => ph.openAppSettings();
+
   /// Cetak [bytes] ke printer [mac] (atau MAC tersimpan).
   ///
   /// Lempar [PrinterException] dengan pesan ramah untuk semua kegagalan.
@@ -87,9 +107,7 @@ class PrinterService {
     }
     final granted = await _adapter.permissionGranted;
     if (!granted) {
-      throw PrinterException(
-        'Izin Bluetooth belum diberikan. Aktifkan "Perangkat di sekitar" untuk aplikasi ini di Pengaturan HP.',
-      );
+      throw PrinterNeedsSetupException();
     }
     final on = await _adapter.bluetoothEnabled;
     if (!on) throw PrinterException('Nyalakan Bluetooth dulu.');

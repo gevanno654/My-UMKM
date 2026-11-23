@@ -41,16 +41,14 @@ void main() {
     expect(() => svc.printBytes([1, 2, 3]), throwsA(isA<PrinterException>()));
   });
 
-  test('izin ditolak lempar pesan pengaturan', () async {
+  test('izin ditolak arahkan ke layar siapkan', () async {
     final svc = PrinterService(
       storage: FakeSecureStorage()..map[printerMacKey] = '00:11:22:33:44:55',
       adapter: _DeniedAdapter(),
     );
     expect(
       () => svc.printBytes([1, 2, 3]),
-      throwsA(
-        isA<PrinterException>().having((e) => e.message, 'message', contains('Pengaturan')),
-      ),
+      throwsA(isA<PrinterNeedsSetupException>()),
     );
   });
 }
