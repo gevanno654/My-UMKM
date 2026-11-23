@@ -19,6 +19,9 @@ const _nativeTimeout = Duration(seconds: 15);
 /// Kunci MAC printer tersimpan (per-HP, tidak ikut sinkron).
 const printerMacKey = 'printer_mac';
 
+/// Kunci nama printer tersimpan (ditampilkan di layar siapkan + status).
+const printerNameKey = 'printer_name';
+
 /// Adapter tipis di atas print_bluetooth_thermal agar bisa di-fake di test.
 class PrinterAdapter {
   Future<bool> get permissionGranted =>
@@ -56,6 +59,20 @@ class PrinterService {
   Future<String?> savedMac() => _storage.read(printerMacKey);
 
   Future<void> saveMac(String mac) => _storage.write(printerMacKey, mac);
+
+  /// Simpan nama+MAC berpasangan (ganti printer = tulis ulang keduanya).
+  Future<void> savePrinter({required String name, required String mac}) async {
+    await _storage.write(printerNameKey, name);
+    await _storage.write(printerMacKey, mac);
+  }
+
+  /// Printer tersimpan (nama, mac); null bila belum disiapkan.
+  Future<(String, String)?> savedPrinter() async {
+    final name = await _storage.read(printerNameKey);
+    final mac = await _storage.read(printerMacKey);
+    if (name == null || name.isEmpty || mac == null || mac.isEmpty) return null;
+    return (name, mac);
+  }
 
   /// Daftar printer yang sudah di-pair di HP.
   Future<List<BluetoothInfo>> pairedPrinters() => _adapter.paired();

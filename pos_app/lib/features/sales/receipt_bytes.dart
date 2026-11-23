@@ -1,4 +1,5 @@
 import 'package:esc_pos_utils_plus/esc_pos_utils_plus.dart';
+import 'package:print_bluetooth_thermal/print_bluetooth_thermal.dart';
 
 import 'sale_model.dart';
 import 'sales_screens.dart' show formatRupiah;
@@ -30,7 +31,35 @@ String receiptItemName(String name) =>
 String receiptItemLine(int qty, int price, int subtotal) =>
     receiptPair('$qty x ${formatRupiah(price)}', formatRupiah(subtotal));
 
-/// Bangun byte ESC/POS struk 58mm dari [sale].
+/// Kata kunci nama perangkat yang kemungkinan printer struk.
+final _printerNamePattern = RegExp(
+  'printer|thermal|xprinter|iware|rpp|pos|58mm|80mm|btprinter',
+  caseSensitive: false,
+);
+
+/// True bila [name] tampak seperti printer struk (mis. "RPP02N").
+bool isLikelyPrinter(String name) => _printerNamePattern.hasMatch(name);
+
+/// Rekord partisi daftar perangkat: printer kemungkinan + sisanya.
+typedef PartitionedDevices = ({
+  List<BluetoothInfo> printers,
+  List<BluetoothInfo> others,
+});
+
+/// Pisah daftar paired: yang mirip printer di atas, sisanya di bawah.
+/// Tidak ada yang hilang — semua perangkat tetap bisa dipilih.
+PartitionedDevices partitionPrinters(List<BluetoothInfo> devices) {
+  final printers = <BluetoothInfo>[];
+  final others = <BluetoothInfo>[];
+  for (final d in devices) {
+    if (isLikelyPrinter(d.name)) {
+      printers.add(d);
+    } else {
+      others.add(d);
+    }
+  }
+  return (printers: printers, others: others);
+}
 ///
 /// Murni: tidak menyentuh printer/Bluetooth, aman untuk unit test.
 /// [storeName] dilewat sebagai parameter (di-resolve via `resolveStore`).
