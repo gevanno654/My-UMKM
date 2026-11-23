@@ -2,11 +2,13 @@ import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:pos_app/core/db/app_db.dart';
 import 'package:pos_app/core/session/secure_session.dart';
 import 'package:pos_app/features/auth/auth_provider.dart';
 import 'package:pos_app/features/auth/auth_state.dart';
 import 'package:pos_app/features/sales/printer_service.dart';
+import 'package:pos_app/features/sales/printer_setup_screen.dart';
 import 'package:pos_app/features/sales/sales_provider.dart';
 import 'package:pos_app/features/sales/sales_screens.dart';
 
@@ -88,24 +90,28 @@ Future<ProviderContainer> makeReceipt(WidgetTester tester) async {
 }
 
 class _FakeFailingStorage implements SecureStorage {
-  String? mac;
+  final map = <String, String>{};
 
   @override
   Future<void> delete(String key) async {
-    mac = null;
+    map.remove(key);
   }
 
   @override
   Future<void> deleteAll() async {
-    mac = null;
+    map.clear();
   }
 
   @override
-  Future<String?> read(String key) async => mac;
+  Future<String?> read(String key) async => map[key];
 
   @override
   Future<void> write(String key, String? value) async {
-    mac = value;
+    if (value == null) {
+      map.remove(key);
+    } else {
+      map[key] = value;
+    }
   }
 }
 
@@ -126,10 +132,25 @@ Future<void> pumpReceipt(
   ProviderContainer container, {
   PrinterService? printerService,
 }) async {
+  final router = GoRouter(
+    initialLocation: '/receipt',
+    routes: [
+      GoRoute(
+        path: '/receipt',
+        builder: (context, state) =>
+            ReceiptScreen(printerService: printerService),
+      ),
+      GoRoute(
+        path: '/settings/printer',
+        builder: (context, state) => const PrinterSetupScreen(),
+      ),
+    ],
+  );
+  addTearDown(router.dispose);
   await tester.pumpWidget(
     UncontrolledProviderScope(
       container: container,
-      child: MaterialApp(home: ReceiptScreen(printerService: printerService)),
+      child: MaterialApp.router(routerConfig: router),
     ),
   );
   await tester.runAsync(() async {
@@ -148,13 +169,35 @@ void main() {
       expect(find.text('Transaksi Baru'), findsOneWidget);
     });
 
-    testWidgets('ketuk Cetak tanpa printer tampilkan snackbar, tidak crash', (
+    testWidgets('ketuk Cetak tanpa printer → snackbar + jalan pintas siapkan', (
       tester,
     ) async {
       final container = await makeReceipt(tester);
+      final svc = PrinterService(
+        storage: _FakeFailingStorage(),
+        adapter: _FakeFailingAdapter(),
+      );
+      await pumpReceipt(tester, container, printerService: svc);
+      await tester.tap(find.text('Cetak Struk'));
+      await tester.runAsync(() async {
+        await Future<void>.delayed(const Duration(seconds: 2));
+      });
+      await tester.pump();
+      expect(find.byType(SnackBar), findsOneWidget);
+      expect(find.text('Belum ada printer. Siapkan dulu.'), findsOneWidget);
+      // SnackBarAction ada dan berlabel benar (navigasi /settings/printer
+      // terdaftar di pumpReceipt; tap action rawan hit-test di widget test).
+      final actions = tester
+          .widgetList<SnackBarAction>(find.byType(SnackBarAction))
+          .toList();
+      expect(actions.map((a) => a.label), contains('Siapkan Printer'));
+    });
+
+    testWidgets('gagal connect tampilkan snackbar, tidak crash', (tester) async {
+      final container = await makeReceipt(tester);
       final storage = _FakeFailingStorage();
       final svc = PrinterService(storage: storage, adapter: _FakeFailingAdapter());
-      await svc.saveMac('00:11:22:33:44:55');
+      await svc.savePrinter(name: 'RPP02N', mac: '00:11:22:33:44:55');
       await pumpReceipt(tester, container, printerService: svc);
       await tester.tap(find.text('Cetak Struk'));
       await tester.runAsync(() async {

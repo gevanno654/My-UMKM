@@ -417,7 +417,8 @@ class ReceiptScreen extends ConsumerStatefulWidget {
 class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
   bool _printing = false;
 
-  /// Cetak opt-in: bangun byte dari transaksi tampil → pilih printer → cetak.
+  /// Cetak opt-in 1 ketukan ke printer yang sudah disiapkan.
+  /// Belum disiapkan / izin belum granted → snackbar + jalan pintas siapkan.
   /// Gagal = snackbar saja; kasir tidak diblokir.
   /// Tombol dikunci selama mencetak agar cetakan tidak interleave.
   Future<void> _print(BuildContext context, SaleModel sale) async {
@@ -428,20 +429,34 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
       final (_, storeName) = await resolveStore(ref);
       final bytes = await buildReceiptBytes(sale: sale, storeName: storeName);
       final svc = widget.printerService ?? PrinterService();
-      final saved = await svc.savedMac();
-      String? mac = saved;
+      final saved = await svc.savedPrinter();
       if (!context.mounted) return;
-      if (mac == null) {
-        mac = await showDialog<String>(
-          context: context,
-          builder: (context) => _PrinterDialog(service: svc),
+      if (saved == null) {
+        messenger.showSnackBar(
+          SnackBar(
+            content: const Text('Belum ada printer. Siapkan dulu.'),
+            action: SnackBarAction(
+              label: 'Siapkan Printer',
+              onPressed: () => context.push('/settings/printer'),
+            ),
+          ),
         );
-        if (mac == null) return;
-        await svc.saveMac(mac);
+        return;
       }
-      await svc.printBytes(bytes, mac: mac);
+      await svc.printBytes(bytes, mac: saved.$2);
       if (!context.mounted) return;
       messenger.showSnackBar(const SnackBar(content: Text('Struk tercetak.')));
+    } on PrinterNeedsSetupException {
+      if (!context.mounted) return;
+      messenger.showSnackBar(
+        SnackBar(
+          content: const Text('Izin Bluetooth belum diberikan.'),
+          action: SnackBarAction(
+            label: 'Siapkan Printer',
+            onPressed: () => context.push('/settings/printer'),
+          ),
+        ),
+      );
     } on PrinterException catch (e) {
       if (!context.mounted) return;
       messenger.showSnackBar(SnackBar(content: Text(e.message)));
@@ -493,85 +508,8 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
   }
 }
 
-/// Dialog pilih printer: MAC tersimpan + daftar paired + simpan pilihan.
-class _PrinterDialog extends StatefulWidget {
-  const _PrinterDialog({required this.service});
-
-  final PrinterService service;
-
-  @override
-  State<_PrinterDialog> createState() => _PrinterDialogState();
-}
-
-class _PrinterDialogState extends State<_PrinterDialog> {
-  List<PrinterDevice> _devices = const [];
-  bool _loading = true;
-  String? _error;
-
-  @override
-  void initState() {
-    super.initState();
-    _load();
-  }
-
-  Future<void> _load() async {
-    try {
-      final paired = await widget.service.pairedPrinters();
-      if (!mounted) return;
-      setState(() {
-        _devices = paired.map((b) => PrinterDevice(b.name, b.macAdress)).toList();
-        _loading = false;
-      });
-    } on PrinterException catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _error = e.message;
-        _loading = false;
-      });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        _error = 'Gagal memindai printer. Coba lagi.';
-        _loading = false;
-      });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Pilih Printer'),
-      content: SizedBox(
-        width: double.maxFinite,
-        child: _loading
-            ? const Center(child: CircularProgressIndicator())
-            : _error != null
-            ? Text(_error!)
-            : _devices.isEmpty
-            ? const Text(
-                'Tidak ada printer ter-pairing.\nPairing dulu di Pengaturan Bluetooth HP.',
-              )
-            : ListView.builder(
-                shrinkWrap: true,
-                itemCount: _devices.length,
-                itemBuilder: (context, i) => ListTile(
-                  leading: const Icon(Icons.print_outlined),
-                  title: Text(
-                    _devices[i].name.isEmpty ? '(tanpa nama)' : _devices[i].name,
-                  ),
-                  subtitle: Text(_devices[i].mac),
-                  onTap: () => Navigator.pop(context, _devices[i].mac),
-                ),
-              ),
-      ),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Batal')),
-      ],
-    );
-  }
-}
-
-/// Nama + MAC printer untuk dialog (terlepas dari tipe paket).
+/// Nama + MAC printer untuk layar siapkan (terlepas dari tipe paket).
+/// Dipakai ulang bila nanti butuh daftar di tempat lain.
 class PrinterDevice {
   const PrinterDevice(this.name, this.mac);
 
