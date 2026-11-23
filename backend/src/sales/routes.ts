@@ -9,6 +9,7 @@ const itemSchema = z.object({
   productId: z.string().uuid().optional().nullable(),
   name: z.string().min(1).max(100).optional(),
   price: z.number().int().min(0).max(999999999).optional(),
+  costPrice: z.number().int().min(0).max(999999999).optional().default(0),
   qty: z.number().int().min(1).max(9999),
 });
 
@@ -74,7 +75,7 @@ salesRouter.get("/", async (req, res) => {
   const out = [];
   for (const s of sales.rows) {
     const items = await getPool().query(
-      `SELECT id, product_id, name, price, qty, subtotal
+      `SELECT id, product_id, name, price, cost_price, qty, subtotal
          FROM sale_items WHERE sale_id = $1 ORDER BY name`,
       [s.id],
     );
@@ -86,6 +87,7 @@ salesRouter.get("/", async (req, res) => {
           productId: r.product_id,
           name: r.name,
           price: r.price,
+          costPrice: r.cost_price,
           qty: r.qty,
           subtotal: r.subtotal,
         })),
@@ -119,7 +121,7 @@ salesRouter.post("/:id/void", async (req, res) => {
     // Idempotent: sudah voided -> kembalikan sukses tanpa mutasi ulang.
     if (found.rows[0].status === "voided") {
       const items = await client.query(
-        `SELECT id, product_id, name, price, qty, subtotal
+        `SELECT id, product_id, name, price, cost_price, qty, subtotal
            FROM sale_items WHERE sale_id = $1 ORDER BY name`,
         [req.params.id],
       );
@@ -138,6 +140,7 @@ salesRouter.post("/:id/void", async (req, res) => {
             productId: r.product_id,
             name: r.name,
             price: r.price,
+            costPrice: r.cost_price,
             qty: r.qty,
             subtotal: r.subtotal,
           })),
@@ -165,7 +168,7 @@ salesRouter.post("/:id/void", async (req, res) => {
     );
     await client.query("COMMIT");
     const outItems = await getPool().query(
-      `SELECT id, product_id, name, price, qty, subtotal
+      `SELECT id, product_id, name, price, cost_price, qty, subtotal
          FROM sale_items WHERE sale_id = $1 ORDER BY name`,
       [req.params.id],
     );
@@ -177,6 +180,7 @@ salesRouter.post("/:id/void", async (req, res) => {
           productId: r.product_id,
           name: r.name,
           price: r.price,
+          costPrice: r.cost_price,
           qty: r.qty,
           subtotal: r.subtotal,
         })),
@@ -220,7 +224,7 @@ salesRouter.post("/", async (req, res) => {
       if ((existing.rowCount ?? 0) > 0) {
         const prev = existing.rows[0];
         const prevItems = await client.query(
-          `SELECT id, product_id, name, price, qty, subtotal
+          `SELECT id, product_id, name, price, cost_price, qty, subtotal
              FROM sale_items WHERE sale_id = $1 ORDER BY name`,
           [prev.id],
         );
@@ -232,6 +236,7 @@ salesRouter.post("/", async (req, res) => {
               productId: r.product_id,
               name: r.name,
               price: r.price,
+              costPrice: r.cost_price,
               qty: r.qty,
               subtotal: r.subtotal,
             })),
@@ -241,16 +246,20 @@ salesRouter.post("/", async (req, res) => {
     }
     await client.query("BEGIN");
     // Kunci baris produk agar 2 kasir bersamaan tidak menjual stok yang sama.
+    // Snapshot cost_price: kiriman HP (dibaca dari kolom katalog HP saat
+    // checkout) dipakai bila >= 0; fallback ke cost_price server agar HP lama
+    // (tanpa costPrice) tetap menghasilkan laba yang benar, bukan 0.
     const lines: {
       productId: string | null;
       name: string;
       price: number;
+      costPrice: number;
       qty: number;
     }[] = [];
     for (const item of items) {
       if (item.productId != null) {
         const prod = await client.query(
-          `SELECT id, name, sell_price, stock FROM products
+          `SELECT id, name, sell_price, cost_price, stock FROM products
             WHERE id = $1::uuid AND store_id = $2::uuid AND deleted_at IS NULL
             FOR UPDATE`,
           [item.productId, storeId],
@@ -268,6 +277,10 @@ salesRouter.post("/", async (req, res) => {
           productId: row.id,
           name: row.name,
           price: row.sell_price,
+          costPrice:
+            item.costPrice != null && item.costPrice > 0
+              ? item.costPrice
+              : (row.cost_price ?? 0),
           qty: item.qty,
         });
         await client.query(
@@ -284,6 +297,7 @@ salesRouter.post("/", async (req, res) => {
           productId: null,
           name: item.name,
           price: item.price,
+          costPrice: item.costPrice ?? 0,
           qty: item.qty,
         });
       }
@@ -305,10 +319,10 @@ salesRouter.post("/", async (req, res) => {
     const outItems = [];
     for (const l of lines) {
       const itemRows = await client.query(
-        `INSERT INTO sale_items (id, sale_id, product_id, name, price, qty, subtotal)
-          VALUES (gen_random_uuid(), $1, $2::uuid, $3, $4, $5, $6)
-          RETURNING id, product_id, name, price, qty, subtotal`,
-        [sale.id, l.productId, l.name, l.price, l.qty, l.price * l.qty],
+        `INSERT INTO sale_items (id, sale_id, product_id, name, price, cost_price, qty, subtotal)
+          VALUES (gen_random_uuid(), $1, $2::uuid, $3, $4, $5, $6, $7)
+          RETURNING id, product_id, name, price, cost_price, qty, subtotal`,
+        [sale.id, l.productId, l.name, l.price, l.costPrice, l.qty, l.price * l.qty],
       );
       const r = itemRows.rows[0];
       outItems.push({
@@ -316,6 +330,7 @@ salesRouter.post("/", async (req, res) => {
         productId: r.product_id,
         name: r.name,
         price: r.price,
+        costPrice: r.cost_price,
         qty: r.qty,
         subtotal: r.subtotal,
       });

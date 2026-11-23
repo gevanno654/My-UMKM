@@ -69,6 +69,7 @@ Map<String, dynamic> saleJson({
       'productId': 'p1',
       'name': 'Indomie',
       'price': 3500,
+      'costPrice': 2500,
       'qty': 2,
       'subtotal': 7000,
     },
@@ -279,6 +280,46 @@ void main() {
   });
 
   group('sinkron manual', () {
+    test('POST sale menyertakan costPrice snapshot', () async {
+      // Verifikasi: client sekarang mengirim costPrice. Sebelum fix ini,
+      // body tidak memuat costPrice sehingga laba di cloud selalu 0/NULL.
+      Map<String, dynamic>? posted;
+      final env = await makeSales(
+        apiHandler: (options) async {
+          if (options.method == 'PUT') {
+            return ok(options, {
+              'id': 'p1',
+              'name': 'Indomie',
+              'barcode': null,
+              'costPrice': 2500,
+              'sellPrice': 3500,
+              'stock': 3,
+              'category': '',
+              'photoPath': '',
+              'updatedAt': '2026-01-01T00:00:00.000Z',
+              'deletedAt': null,
+            });
+          }
+          if (options.method == 'POST' && options.path.endsWith('/sales')) {
+            posted = Map<String, dynamic>.from(
+              options.data as Map<String, dynamic>,
+            );
+            return ok(options, saleJson(), 201);
+          }
+          return ok(options, []);
+        },
+      );
+      await env.notifier.addItem('p1', 2);
+      await env.notifier.checkout(paid: 7000, method: PayMethod.tunai);
+      await env.notifier.syncNow(accessToken: 'token');
+
+      expect(posted, isNotNull);
+      final items = (posted!['items'] as List)
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
+      expect(items.single['costPrice'], 2500);
+    });
+
     test('sale berisi produk belum di server -> push katalog dulu lalu retry', () async {
       // Sinkron kasir sekaligus sinkron produk (stok): produk terkait
       // dirty sales selalu di-push DULU, baru sale di-POST sekali.
@@ -381,6 +422,11 @@ void main() {
         env.notifier.state.history.map((s) => s.id),
         contains('srv1'),
       );
+      // costPrice dari server tetap terbaca (bukan 0).
+      final pulled = env.notifier.state.history.firstWhere(
+        (s) => s.id == 'srv1',
+      );
+      expect(pulled.items.single.costPrice, 2500);
     });
 
     test('nomor duplikat 409 -> pesan buat ulang', () async {      final env = await makeSales(
