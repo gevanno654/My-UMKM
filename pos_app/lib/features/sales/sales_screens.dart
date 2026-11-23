@@ -8,6 +8,8 @@ import 'package:go_router/go_router.dart';
 import '../../core/db/app_db.dart';
 import '../auth/auth_provider.dart';
 import '../auth/auth_state.dart';
+import 'printer_service.dart';
+import 'receipt_bytes.dart';
 import 'sale_model.dart';
 import 'sales_provider.dart';
 
@@ -403,7 +405,43 @@ class _PayScreenState extends ConsumerState<PayScreen> {
 /// Struk layar: nomor, tanggal, item×qty, total, bayar, kembali, metode.
 /// [ReceiptView] terstruktur terpisah agar printer Bluetooth tinggal plug-in.
 class ReceiptScreen extends ConsumerWidget {
-  const ReceiptScreen({super.key});
+  const ReceiptScreen({super.key, this.printerService});
+
+  /// Diinjeksi di test agar tidak menyentuh Bluetooth asli.
+  final PrinterService? printerService;
+
+  /// Cetak opt-in: bangun byte dari transaksi tampil → pilih printer → cetak.
+  /// Gagal = snackbar saja; kasir tidak diblokir.
+  Future<void> _print(BuildContext context, WidgetRef ref, SaleModel sale) async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final (_, storeName) = await resolveStore(ref);
+      final bytes = await buildReceiptBytes(sale: sale, storeName: storeName);
+      final svc = printerService ?? PrinterService();
+      final saved = await svc.savedMac();
+      String? mac = saved;
+      if (!context.mounted) return;
+      if (mac == null) {
+        mac = await showDialog<String>(
+          context: context,
+          builder: (context) => _PrinterDialog(service: svc),
+        );
+        if (mac == null) return;
+        await svc.saveMac(mac);
+      }
+      await svc.printBytes(bytes, mac: mac);
+      if (!context.mounted) return;
+      messenger.showSnackBar(const SnackBar(content: Text('Struk tercetak.')));
+    } on PrinterException catch (e) {
+      if (!context.mounted) return;
+      messenger.showSnackBar(SnackBar(content: Text(e.message)));
+    } catch (_) {
+      if (!context.mounted) return;
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Gagal mencetak. Coba lagi.')),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -419,6 +457,13 @@ class ReceiptScreen extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Expanded(child: ReceiptView(sale: sale)),
+                  const SizedBox(height: 8),
+                  OutlinedButton.icon(
+                    onPressed: () => _print(context, ref, sale),
+                    icon: const Icon(Icons.print_outlined),
+                    label: const Text('Cetak Struk'),
+                  ),
+                  const SizedBox(height: 8),
                   FilledButton(
                     onPressed: () => context.go('/sales'),
                     child: const Text('Transaksi Baru'),
@@ -428,6 +473,92 @@ class ReceiptScreen extends ConsumerWidget {
             ),
     );
   }
+}
+
+/// Dialog pilih printer: MAC tersimpan + daftar paired + simpan pilihan.
+class _PrinterDialog extends StatefulWidget {
+  const _PrinterDialog({required this.service});
+
+  final PrinterService service;
+
+  @override
+  State<_PrinterDialog> createState() => _PrinterDialogState();
+}
+
+class _PrinterDialogState extends State<_PrinterDialog> {
+  List<PrinterDevice> _devices = const [];
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final paired = await widget.service.pairedPrinters();
+      if (!mounted) return;
+      setState(() {
+        _devices = paired.map((b) => PrinterDevice(b.name, b.macAdress)).toList();
+        _loading = false;
+      });
+    } on PrinterException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.message;
+        _loading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _error = 'Gagal memindai printer. Coba lagi.';
+        _loading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Pilih Printer'),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: _loading
+            ? const Center(child: CircularProgressIndicator())
+            : _error != null
+            ? Text(_error!)
+            : _devices.isEmpty
+            ? const Text(
+                'Tidak ada printer ter-pairing.\nPairing dulu di Pengaturan Bluetooth HP.',
+              )
+            : ListView.builder(
+                shrinkWrap: true,
+                itemCount: _devices.length,
+                itemBuilder: (context, i) => ListTile(
+                  leading: const Icon(Icons.print_outlined),
+                  title: Text(
+                    _devices[i].name.isEmpty ? '(tanpa nama)' : _devices[i].name,
+                  ),
+                  subtitle: Text(_devices[i].mac),
+                  onTap: () => Navigator.pop(context, _devices[i].mac),
+                ),
+              ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Batal')),
+      ],
+    );
+  }
+}
+
+/// Nama + MAC printer untuk dialog (terlepas dari tipe paket).
+class PrinterDevice {
+  const PrinterDevice(this.name, this.mac);
+
+  final String name;
+  final String mac;
 }
 
 class ReceiptView extends StatelessWidget {
