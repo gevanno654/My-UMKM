@@ -40,6 +40,8 @@ class Products extends Table {
   IntColumn get stock => integer().withDefault(const Constant(0))();
   TextColumn get category => text().withDefault(const Constant(''))();
   TextColumn get photoPath => text().withDefault(const Constant(''))();
+  TextColumn get photoHash => text().withDefault(const Constant(''))();
+  IntColumn get photoSize => integer().withDefault(const Constant(0))();
   BoolColumn get isArchived => boolean().withDefault(const Constant(false))();
   IntColumn get createdAt => integer()();
   IntColumn get updatedAt => integer()();
@@ -187,7 +189,7 @@ class AppDb extends _$AppDb {
   static AppDb openMemory() => AppDb(openMemoryDb());
 
   @override
-  int get schemaVersion => 6;
+  int get schemaVersion => 7;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -217,6 +219,11 @@ class AppDb extends _$AppDb {
       // v5 → v6: snapshot harga beli per item jual (laba akurat permanen).
       if (from <= 5) {
         await m.addColumn(saleItems, saleItems.costPrice);
+      }
+      // v6 → v7: hash + ukuran foto produk (sinkron file delta).
+      if (from <= 6) {
+        await m.addColumn(products, products.photoHash);
+        await m.addColumn(products, products.photoSize);
       }
     },
   );

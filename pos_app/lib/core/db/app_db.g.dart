@@ -625,6 +625,30 @@ class $ProductsTable extends Products with TableInfo<$ProductsTable, Product> {
     requiredDuringInsert: false,
     defaultValue: const Constant(''),
   );
+  static const VerificationMeta _photoHashMeta = const VerificationMeta(
+    'photoHash',
+  );
+  @override
+  late final GeneratedColumn<String> photoHash = GeneratedColumn<String>(
+    'photo_hash',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _photoSizeMeta = const VerificationMeta(
+    'photoSize',
+  );
+  @override
+  late final GeneratedColumn<int> photoSize = GeneratedColumn<int>(
+    'photo_size',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
   static const VerificationMeta _isArchivedMeta = const VerificationMeta(
     'isArchived',
   );
@@ -694,6 +718,8 @@ class $ProductsTable extends Products with TableInfo<$ProductsTable, Product> {
     stock,
     category,
     photoPath,
+    photoHash,
+    photoSize,
     isArchived,
     createdAt,
     updatedAt,
@@ -771,6 +797,18 @@ class $ProductsTable extends Products with TableInfo<$ProductsTable, Product> {
       context.handle(
         _photoPathMeta,
         photoPath.isAcceptableOrUnknown(data['photo_path']!, _photoPathMeta),
+      );
+    }
+    if (data.containsKey('photo_hash')) {
+      context.handle(
+        _photoHashMeta,
+        photoHash.isAcceptableOrUnknown(data['photo_hash']!, _photoHashMeta),
+      );
+    }
+    if (data.containsKey('photo_size')) {
+      context.handle(
+        _photoSizeMeta,
+        photoSize.isAcceptableOrUnknown(data['photo_size']!, _photoSizeMeta),
       );
     }
     if (data.containsKey('is_archived')) {
@@ -856,6 +894,14 @@ class $ProductsTable extends Products with TableInfo<$ProductsTable, Product> {
         DriftSqlType.string,
         data['${effectivePrefix}photo_path'],
       )!,
+      photoHash: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}photo_hash'],
+      )!,
+      photoSize: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}photo_size'],
+      )!,
       isArchived: attachedDatabase.typeMapping.read(
         DriftSqlType.bool,
         data['${effectivePrefix}is_archived'],
@@ -895,6 +941,8 @@ class Product extends DataClass implements Insertable<Product> {
   final int stock;
   final String category;
   final String photoPath;
+  final String photoHash;
+  final int photoSize;
   final bool isArchived;
   final int createdAt;
   final int updatedAt;
@@ -910,6 +958,8 @@ class Product extends DataClass implements Insertable<Product> {
     required this.stock,
     required this.category,
     required this.photoPath,
+    this.photoHash = '',
+    this.photoSize = 0,
     required this.isArchived,
     required this.createdAt,
     required this.updatedAt,
@@ -930,6 +980,8 @@ class Product extends DataClass implements Insertable<Product> {
     map['stock'] = Variable<int>(stock);
     map['category'] = Variable<String>(category);
     map['photo_path'] = Variable<String>(photoPath);
+    map['photo_hash'] = Variable<String>(photoHash);
+    map['photo_size'] = Variable<int>(photoSize);
     map['is_archived'] = Variable<bool>(isArchived);
     map['created_at'] = Variable<int>(createdAt);
     map['updated_at'] = Variable<int>(updatedAt);
@@ -953,6 +1005,8 @@ class Product extends DataClass implements Insertable<Product> {
       stock: Value(stock),
       category: Value(category),
       photoPath: Value(photoPath),
+      photoHash: Value(photoHash),
+      photoSize: Value(photoSize),
       isArchived: Value(isArchived),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
@@ -978,6 +1032,8 @@ class Product extends DataClass implements Insertable<Product> {
       stock: serializer.fromJson<int>(json['stock']),
       category: serializer.fromJson<String>(json['category']),
       photoPath: serializer.fromJson<String>(json['photoPath']),
+      photoHash: serializer.fromJson<String>(json['photoHash'] ?? ''),
+      photoSize: serializer.fromJson<int>(json['photoSize'] ?? 0),
       isArchived: serializer.fromJson<bool>(json['isArchived']),
       createdAt: serializer.fromJson<int>(json['createdAt']),
       updatedAt: serializer.fromJson<int>(json['updatedAt']),
@@ -998,6 +1054,8 @@ class Product extends DataClass implements Insertable<Product> {
       'stock': serializer.toJson<int>(stock),
       'category': serializer.toJson<String>(category),
       'photoPath': serializer.toJson<String>(photoPath),
+      'photoHash': serializer.toJson<String>(photoHash),
+      'photoSize': serializer.toJson<int>(photoSize),
       'isArchived': serializer.toJson<bool>(isArchived),
       'createdAt': serializer.toJson<int>(createdAt),
       'updatedAt': serializer.toJson<int>(updatedAt),
@@ -1016,6 +1074,8 @@ class Product extends DataClass implements Insertable<Product> {
     int? stock,
     String? category,
     String? photoPath,
+    String? photoHash,
+    int? photoSize,
     bool? isArchived,
     int? createdAt,
     int? updatedAt,
@@ -1031,6 +1091,8 @@ class Product extends DataClass implements Insertable<Product> {
     stock: stock ?? this.stock,
     category: category ?? this.category,
     photoPath: photoPath ?? this.photoPath,
+    photoHash: photoHash ?? this.photoHash,
+    photoSize: photoSize ?? this.photoSize,
     isArchived: isArchived ?? this.isArchived,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
@@ -1048,6 +1110,8 @@ class Product extends DataClass implements Insertable<Product> {
       stock: data.stock.present ? data.stock.value : this.stock,
       category: data.category.present ? data.category.value : this.category,
       photoPath: data.photoPath.present ? data.photoPath.value : this.photoPath,
+      photoHash: data.photoHash.present ? data.photoHash.value : this.photoHash,
+      photoSize: data.photoSize.present ? data.photoSize.value : this.photoSize,
       isArchived: data.isArchived.present
           ? data.isArchived.value
           : this.isArchived,
@@ -1070,6 +1134,8 @@ class Product extends DataClass implements Insertable<Product> {
           ..write('stock: $stock, ')
           ..write('category: $category, ')
           ..write('photoPath: $photoPath, ')
+          ..write('photoHash: $photoHash, ')
+          ..write('photoSize: $photoSize, ')
           ..write('isArchived: $isArchived, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
@@ -1090,6 +1156,8 @@ class Product extends DataClass implements Insertable<Product> {
     stock,
     category,
     photoPath,
+    photoHash,
+    photoSize,
     isArchived,
     createdAt,
     updatedAt,
@@ -1109,6 +1177,8 @@ class Product extends DataClass implements Insertable<Product> {
           other.stock == this.stock &&
           other.category == this.category &&
           other.photoPath == this.photoPath &&
+          other.photoHash == this.photoHash &&
+          other.photoSize == this.photoSize &&
           other.isArchived == this.isArchived &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt &&
@@ -1126,6 +1196,8 @@ class ProductsCompanion extends UpdateCompanion<Product> {
   final Value<int> stock;
   final Value<String> category;
   final Value<String> photoPath;
+  final Value<String> photoHash;
+  final Value<int> photoSize;
   final Value<bool> isArchived;
   final Value<int> createdAt;
   final Value<int> updatedAt;
@@ -1142,6 +1214,8 @@ class ProductsCompanion extends UpdateCompanion<Product> {
     this.stock = const Value.absent(),
     this.category = const Value.absent(),
     this.photoPath = const Value.absent(),
+    this.photoHash = const Value.absent(),
+    this.photoSize = const Value.absent(),
     this.isArchived = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
@@ -1159,6 +1233,8 @@ class ProductsCompanion extends UpdateCompanion<Product> {
     this.stock = const Value.absent(),
     this.category = const Value.absent(),
     this.photoPath = const Value.absent(),
+    this.photoHash = const Value.absent(),
+    this.photoSize = const Value.absent(),
     this.isArchived = const Value.absent(),
     required int createdAt,
     required int updatedAt,
@@ -1182,6 +1258,8 @@ class ProductsCompanion extends UpdateCompanion<Product> {
     Expression<int>? stock,
     Expression<String>? category,
     Expression<String>? photoPath,
+    Expression<String>? photoHash,
+    Expression<int>? photoSize,
     Expression<bool>? isArchived,
     Expression<int>? createdAt,
     Expression<int>? updatedAt,
@@ -1199,6 +1277,8 @@ class ProductsCompanion extends UpdateCompanion<Product> {
       if (stock != null) 'stock': stock,
       if (category != null) 'category': category,
       if (photoPath != null) 'photo_path': photoPath,
+      if (photoHash != null) 'photo_hash': photoHash,
+      if (photoSize != null) 'photo_size': photoSize,
       if (isArchived != null) 'is_archived': isArchived,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
@@ -1218,6 +1298,8 @@ class ProductsCompanion extends UpdateCompanion<Product> {
     Value<int>? stock,
     Value<String>? category,
     Value<String>? photoPath,
+    Value<String>? photoHash,
+    Value<int>? photoSize,
     Value<bool>? isArchived,
     Value<int>? createdAt,
     Value<int>? updatedAt,
@@ -1235,6 +1317,8 @@ class ProductsCompanion extends UpdateCompanion<Product> {
       stock: stock ?? this.stock,
       category: category ?? this.category,
       photoPath: photoPath ?? this.photoPath,
+      photoHash: photoHash ?? this.photoHash,
+      photoSize: photoSize ?? this.photoSize,
       isArchived: isArchived ?? this.isArchived,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -1273,6 +1357,12 @@ class ProductsCompanion extends UpdateCompanion<Product> {
     }
     if (photoPath.present) {
       map['photo_path'] = Variable<String>(photoPath.value);
+    }
+    if (photoHash.present) {
+      map['photo_hash'] = Variable<String>(photoHash.value);
+    }
+    if (photoSize.present) {
+      map['photo_size'] = Variable<int>(photoSize.value);
     }
     if (isArchived.present) {
       map['is_archived'] = Variable<bool>(isArchived.value);

@@ -16,6 +16,8 @@ class ProductModel {
     this.stock = 0,
     this.category = '',
     this.photoPath = '',
+    this.photoHash = '',
+    this.photoSize = 0,
     this.isArchived = false,
     required this.createdAt,
     required this.updatedAt,
@@ -31,6 +33,12 @@ class ProductModel {
   final int stock;
   final String category;
   final String photoPath;
+
+  /// SHA-256 file foto ('' = belum ada); identitas foto lintas HP.
+  final String photoHash;
+
+  /// Ukuran file foto bytes (0 = belum ada).
+  final int photoSize;
   final bool isArchived;
   final int createdAt;
   final int updatedAt;
@@ -82,6 +90,8 @@ class ProductModel {
     stock: row.stock,
     category: row.category,
     photoPath: row.photoPath,
+    photoHash: row.photoHash,
+    photoSize: row.photoSize,
     isArchived: row.isArchived,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
@@ -100,6 +110,8 @@ class ProductModel {
     stock: Value(stock),
     category: Value(category),
     photoPath: Value(photoPath),
+    photoHash: Value(photoHash),
+    photoSize: Value(photoSize),
     isArchived: Value(isArchived),
     createdAt: createdAt,
     updatedAt: updatedAt,

@@ -138,6 +138,8 @@ class ProductsNotifier extends Notifier<ProductsState> {
             stock: Value(p.stock),
             category: Value(p.category),
             photoPath: Value(p.photoPath),
+            photoHash: Value(p.photoHash),
+            photoSize: Value(p.photoSize),
             isArchived: Value(p.isArchived),
             createdAt: Value(existing.createdAt),
             updatedAt: Value(now),
@@ -171,6 +173,8 @@ class ProductsNotifier extends Notifier<ProductsState> {
     int stock = 0,
     String category = '',
     String photoPath = '',
+    String photoHash = '',
+    int photoSize = 0,
   }) {
     final now = DateTime.now().toUtc().millisecondsSinceEpoch;
     return ProductModel(
@@ -183,6 +187,8 @@ class ProductsNotifier extends Notifier<ProductsState> {
       stock: stock,
       category: category,
       photoPath: photoPath,
+      photoHash: photoHash,
+      photoSize: photoSize,
       createdAt: now,
       updatedAt: now,
     );
@@ -296,6 +302,9 @@ class ProductsNotifier extends Notifier<ProductsState> {
     final server = await _api.list(accessToken, _storeId);
     for (final s in server) {
       final local = await _db.getProduct(s.id);
+      // Identitas foto = hash, bukan path: path lokal dipertahankan
+      // (file milik HP ini), hanya hash/size yang ikut server.
+      final localModel = local?.toModel();
       if (local == null) {
         await _db.upsertProduct(
           ProductsCompanion.insert(
@@ -307,7 +316,9 @@ class ProductsNotifier extends Notifier<ProductsState> {
             sellPrice: s.sellPrice,
             stock: Value(s.stock),
             category: Value(s.category),
-            photoPath: Value(s.photoPath),
+            photoPath: Value(localModel?.photoPath ?? ''),
+            photoHash: Value(s.photoHash),
+            photoSize: Value(s.photoSize),
             createdAt: s.createdAt,
             updatedAt: s.updatedAt,
             dirty: const Value(0),
@@ -317,10 +328,9 @@ class ProductsNotifier extends Notifier<ProductsState> {
         await _db.markClean([s.id]);
         continue;
       }
-      final localModel = local.toModel();
       // Delete selalu menang atas edit lokal.
       if (s.deletedAt != null) {
-        if (localModel.deletedAt == null ||
+        if (localModel!.deletedAt == null ||
             s.deletedAt! > localModel.deletedAt!) {
           await _db.softDeleteProduct(s.id, s.deletedAt!);
           await _db.markClean([s.id]);
@@ -328,7 +338,7 @@ class ProductsNotifier extends Notifier<ProductsState> {
         continue;
       }
       // LWW metadata: kolom katalog ikut server, stok tetap milik lokal.
-      if (s.updatedAt > localModel.updatedAt) {
+      if (s.updatedAt > localModel!.updatedAt) {
         await _db.upsertProduct(
           ProductsCompanion.insert(
             id: s.id,
@@ -339,7 +349,9 @@ class ProductsNotifier extends Notifier<ProductsState> {
             sellPrice: s.sellPrice,
             stock: Value(localModel.stock),
             category: Value(s.category),
-            photoPath: Value(s.photoPath),
+            photoPath: Value(localModel.photoPath),
+            photoHash: Value(s.photoHash),
+            photoSize: Value(s.photoSize),
             isArchived: Value(localModel.isArchived),
             createdAt: localModel.createdAt,
             updatedAt: s.updatedAt,

@@ -237,6 +237,9 @@ void main() {
       String? barcode,
       int updatedAt = 1000,
       int stock = 5,
+      String photoPath = '',
+      String photoHash = '',
+      int photoSize = 0,
     }) => ProductModel(
       id: id,
       storeId: 'store-1',
@@ -245,6 +248,9 @@ void main() {
       costPrice: 4000,
       sellPrice: 5000,
       stock: stock,
+      photoPath: photoPath,
+      photoHash: photoHash,
+      photoSize: photoSize,
       createdAt: 1000,
       updatedAt: updatedAt,
     );
@@ -255,6 +261,8 @@ void main() {
       String? barcode,
       required int updatedAtMillis,
       String? deletedAt,
+      String photoHash = '',
+      int photoSize = 0,
     }) => {
       'id': id,
       'name': name,
@@ -264,6 +272,8 @@ void main() {
       'stock': 5,
       'category': '',
       'photoPath': '',
+      'photoHash': photoHash,
+      'photoSize': photoSize,
       'updatedAt': DateTime.fromMillisecondsSinceEpoch(
         updatedAtMillis,
         isUtc: true,
@@ -373,6 +383,20 @@ void main() {
         env.notifier.state.products.map((e) => e.id),
         isNot(contains('p-2')),
       );
+    });
+
+    test('save update bawa photoHash/photoSize', () async {
+      final env = makeNotifier((options) => ok(options, []));
+      await env.notifier.load('store-1');
+      await env.notifier.saveProduct(product(id: 'p-1'));
+
+      await env.notifier.saveProduct(
+        product(id: 'p-1', photoHash: 'b' * 64, photoSize: 77),
+      );
+
+      final row = (await env.db.getProduct('p-1'))!;
+      expect(row.photoHash, 'b' * 64);
+      expect(row.photoSize, 77);
     });
 
     test('sync: server lebih baru menang (LWW)', () async {
@@ -490,6 +514,79 @@ void main() {
       expect(env.notifier.state.lastError, contains('Barcode sudah dipakai'));
       expect((await env.db.getProduct('p-ok'))!.dirty, 0);
       expect((await env.db.getProduct('p-konflik'))!.dirty, 1);
+    });
+
+    test('pull: path lokal dipertahankan, hash ikut server', () async {      final env = makeNotifier((options) {
+        if (options.method == 'GET' && options.path.endsWith('/products')) {
+          return ok(options, [
+            serverRow(
+              id: 'p-1',
+              updatedAtMillis: 2000,
+              photoHash: 'a' * 64,
+              photoSize: 123,
+            ),
+          ]);
+        }
+        return ok(options, []);
+      });
+      await env.notifier.load('store-1');
+      await env.db.upsertProduct(
+        ProductsCompanion.insert(
+          id: 'p-1',
+          storeId: 'store-1',
+          name: 'Gula',
+          barcode: const Value.absent(),
+          costPrice: 4000,
+          sellPrice: 5000,
+          stock: const Value(10),
+          photoPath: const Value('product_photos/lokal.jpg'),
+          createdAt: 1000,
+          updatedAt: 1000,
+        ),
+      );
+
+      await env.notifier.pullCatalog('token');
+
+      final row = (await env.db.getProduct('p-1'))!;
+      expect(row.photoPath, 'product_photos/lokal.jpg');
+      expect(row.photoHash, 'a' * 64);
+      expect(row.photoSize, 123);
+      expect(row.stock, 10);
+    });
+  });
+
+  group('PhotoHash', () {
+    test('sha256Of stabil 64-hex; baris bawa hash', () async {
+      final tmp = await Directory.systemTemp.createTemp('photo_hash_test');
+      final src = File('${tmp.path}/src.jpg');
+      await src.writeAsBytes(const [0xff, 0xd8, 0xff, 0xd9]);
+      final store = PhotoStore(docsDirOverride: tmp);
+
+      final h1 = await store.sha256Of(src);
+      final h2 = await store.sha256Of(src);
+      expect(h1, matches(RegExp(r'^[0-9a-f]{64}$')));
+      expect(h1, h2);
+
+      await db.upsertStore(
+        LocalStoresCompanion.insert(serverId: 'store-1', name: 'Toko Evan'),
+      );
+      await db.upsertProduct(
+        ProductsCompanion.insert(
+          id: 'p-hash',
+          storeId: 'store-1',
+          name: 'Kopi',
+          barcode: const Value.absent(),
+          costPrice: 2000,
+          sellPrice: 3000,
+          photoHash: Value(h1),
+          photoSize: const Value(4),
+          createdAt: 1,
+          updatedAt: 1,
+        ),
+      );
+      final row = (await db.getProduct('p-hash'))!;
+      expect(row.photoHash, h1);
+      expect(row.toModel().photoHash, h1);
     });
   });
 

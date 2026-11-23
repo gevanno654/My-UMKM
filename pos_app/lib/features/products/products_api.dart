@@ -100,6 +100,8 @@ class ProductsApi {
         'sellPrice': p.sellPrice,
         'stock': 0,
         'category': p.category,
+        'photoHash': p.photoHash,
+        'photoSize': p.photoSize,
       };
 
   ProductModel _fromServer(Map<String, dynamic> data, String storeId) {
@@ -127,6 +129,8 @@ class ProductsApi {
       stock: (data['stock'] as num?)?.toInt() ?? 0,
       category: data['category'] as String? ?? '',
       photoPath: data['photoPath'] as String? ?? '',
+      photoHash: data['photoHash'] as String? ?? '',
+      photoSize: (data['photoSize'] as num?)?.toInt() ?? 0,
       createdAt: updated.millisecondsSinceEpoch,
       updatedAt: updated.millisecondsSinceEpoch,
       deletedAt: deleted,
@@ -146,6 +150,8 @@ extension ProductRowX on Product {
         stock: stock,
         category: category,
         photoPath: photoPath,
+        photoHash: photoHash,
+        photoSize: photoSize,
         isArchived: isArchived,
         createdAt: createdAt,
         updatedAt: updatedAt,

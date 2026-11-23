@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path/path.dart' as p;
@@ -47,6 +48,13 @@ class PhotoStore {
         .where((s) => s.isNotEmpty && s != '.' && s != '..')
         .toList();
     return File(p.joinAll([docs.path, ...parts]));
+  }
+
+  /// SHA-256 hex (64 char) isi file. Dipakai sebagai identitas foto
+  /// lintas HP: sama persis → tidak perlu transfer ulang.
+  Future<String> sha256Of(File file) async {
+    final bytes = await file.readAsBytes();
+    return sha256.convert(bytes).toString();
   }
 
   /// Hapus file fisik dari path relatif. Dipakai saat purge (bukan saat
