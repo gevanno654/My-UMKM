@@ -145,6 +145,7 @@ void main() {
     await seedProduct(env.db,
         id: 'p2', photoPath: 'product_photos/p2.jpg', photoHash: 'h' * 64);
     await seedProduct(env.db, id: 'p3');
+    await env.db.markClean(['p1', 'p2', 'p3']);
 
     final errors = <String>[];
     await env.notifier.syncPhotos(
@@ -157,8 +158,8 @@ void main() {
     expect(errors, isEmpty);
     final p1 = (await env.db.getProduct('p1'))!;
     expect(p1.photoHash, '9' * 64);
-    // Hash baru ditandai dirty agar ikut push katalog berikutnya.
-    expect(p1.dirty, 1);
+    // Tanpa dirty: hash otoritatif sudah di server, PUT abaikan foto.
+    expect(p1.dirty, 0);
     // p2: hash sama tapi file lokal tidak pernah dibuat → unduh ulang;
     // p3: hash server baru → unduh.
     expect(fake.downloaded, containsAll(['h' * 64, '3' * 64]));

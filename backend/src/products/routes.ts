@@ -295,6 +295,9 @@ productsRouter.post(
 );
 
 /// Hapus file foto produk (dipakai purge; abaikan 404 di client).
+/// Sengaja mencakup baris soft-deleted: alur purge memanggil endpoint ini
+/// SETELAH `DELETE /:id`, sehingga kondisi `deleted_at IS NULL` akan selalu
+/// gagal dan file yatim menumpuk bila dipakai.
 productsRouter.delete("/:id/photo", async (req, res) => {
   const storeId = storeIdOf(req);
   const idParsed = idSchema.safeParse(req.params.id);
@@ -303,7 +306,7 @@ productsRouter.delete("/:id/photo", async (req, res) => {
   }
   const rows = await getPool().query(
     `UPDATE products SET photo_hash = '', photo_size = 0, updated_at = now()
-      WHERE id = $1::uuid AND store_id = $2::uuid AND deleted_at IS NULL
+      WHERE id = $1::uuid AND store_id = $2::uuid
       RETURNING id, photo_hash`,
     [idParsed.data, storeId],
   );

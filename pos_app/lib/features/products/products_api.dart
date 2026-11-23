@@ -158,6 +158,9 @@ class ProductsApi {
   /// hitung stok (hanya berubah via dokumen restock/sale/adjustment),
   /// sehingga push katalog tidak bisa mengacaukan stok cloud. Stok 0 =
   /// baseline produk baru, bukan angka yang menimpa.
+  /// FOTO juga TIDAK DIKIRIM: satu-satunya penulis kolom foto server adalah
+  /// endpoint upload (hash otoritatif dari file). Mengirim hash via PUT
+  /// berisiko hash-tanpa-file bila file tidak ikut terunggah.
   Map<String, dynamic> _toServer(ProductModel p) => {
         'id': p.id,
         'name': p.name,
@@ -166,8 +169,6 @@ class ProductsApi {
         'sellPrice': p.sellPrice,
         'stock': 0,
         'category': p.category,
-        'photoHash': p.photoHash,
-        'photoSize': p.photoSize,
       };
 
   ProductModel _fromServer(Map<String, dynamic> data, String storeId) {

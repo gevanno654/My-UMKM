@@ -112,6 +112,37 @@ describe("foto produk", () => {
     expect(res.status).toBe(413);
   });
 
+  it("purge: produk dihapus lalu hapus foto → 200 + file hilang", async () => {
+    const prod = await request(app)
+      .post("/api/v1/products")
+      .set("Authorization", `Bearer ${tokenA}`)
+      .send({ name: "Purge Foto", sellPrice: 1000, stock: 0 });
+    expect(prod.status).toBe(201);
+    const pid = prod.body.id as string;
+    const bytes = Buffer.from([0xff, 0xd8, 0xff, 0xd9, 0x02]);
+    const up = await request(app)
+      .post(`/api/v1/products/${pid}/photo`)
+      .set("Authorization", `Bearer ${tokenA}`)
+      .attach("photo", bytes, "p.jpg");
+    expect(up.status).toBe(200);
+    const hash = up.body.photoHash as string;
+
+    const delProd = await request(app)
+      .delete(`/api/v1/products/${pid}`)
+      .set("Authorization", `Bearer ${tokenA}`);
+    expect(delProd.status).toBe(200);
+
+    const delPhoto = await request(app)
+      .delete(`/api/v1/products/${pid}/photo`)
+      .set("Authorization", `Bearer ${tokenA}`);
+    expect(delPhoto.status).toBe(200);
+
+    const dl = await request(app)
+      .get(`/api/v1/products/photos/${hash}`)
+      .set("Authorization", `Bearer ${tokenA}`);
+    expect(dl.status).toBe(404);
+  });
+
   it("delete foto → kolom kosong + file hilang", async () => {
     const bytes = Buffer.from([0xff, 0xd8, 0xff, 0xd9, 0x01]);
     const up = await request(app)

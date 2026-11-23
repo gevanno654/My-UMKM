@@ -313,9 +313,8 @@ class ProductsNotifier extends Notifier<ProductsState> {
           photoPath: m.photoPath,
           photoHash: up.photoHash,
           photoSize: up.photoSize,
-          nowMillis: DateTime.now().toUtc().millisecondsSinceEpoch,
         );
-        // Metadata hash ikut push katalog berikutnya (baris jadi dirty).
+        // Hash otoritatif sudah di server; tanpa dirty (PUT abaikan foto).
       } on DioException catch (e) {
         onFileError?.call('${m.name}: ${ProductsApi.friendlyError(e)}');
       }
@@ -350,7 +349,6 @@ class ProductsNotifier extends Notifier<ProductsState> {
             photoPath: rel,
             photoHash: serverHash,
             photoSize: size,
-            nowMillis: DateTime.now().toUtc().millisecondsSinceEpoch,
           );
         }
         if (oldPath.isNotEmpty && oldPath != rel) {

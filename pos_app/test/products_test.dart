@@ -399,13 +399,17 @@ void main() {
       expect(row.photoSize, 77);
     });
 
-    test('push kirim photoHash/photoSize; pull pertahankan path lokal', () async {
+    test(
+        'push abaikan foto (single-writer = upload endpoint); pull pertahankan path lokal',
+        () async {
 
       String? putPhotoHash;
+      var putHasPhotoSize = false;
       final env = makeNotifier((options) {
         if (options.method == 'PUT') {
-          putPhotoHash =
-              (options.data as Map<String, dynamic>)['photoHash'] as String?;
+          final body = options.data as Map<String, dynamic>;
+          putPhotoHash = body['photoHash'] as String?;
+          putHasPhotoSize = body.containsKey('photoSize');
           return ok(options, serverRow(id: 'p-1', updatedAtMillis: 1000));
         }
         return ok(options, [
@@ -430,7 +434,10 @@ void main() {
 
       await env.notifier.syncNow(accessToken: 'access-1');
 
-      expect(putPhotoHash, 'c' * 64);
+      // PUT tidak membawa foto: hash hanya ditulis server via upload
+      // (upload otoritatif, mencegah hash-tanpa-file).
+      expect(putPhotoHash, isNull);
+      expect(putHasPhotoSize, isFalse);
       final row = (await env.db.getProduct('p-1'))!;
       expect(row.photoPath, 'product_photos/lokal.jpg');
       expect(row.photoHash, 'a' * 64);
