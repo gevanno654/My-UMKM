@@ -40,4 +40,22 @@ void main() {
     final svc = PrinterService(storage: FakeSecureStorage());
     expect(() => svc.printBytes([1, 2, 3]), throwsA(isA<PrinterException>()));
   });
+
+  test('izin ditolak lempar pesan pengaturan', () async {
+    final svc = PrinterService(
+      storage: FakeSecureStorage()..map[printerMacKey] = '00:11:22:33:44:55',
+      adapter: _DeniedAdapter(),
+    );
+    expect(
+      () => svc.printBytes([1, 2, 3]),
+      throwsA(
+        isA<PrinterException>().having((e) => e.message, 'message', contains('Pengaturan')),
+      ),
+    );
+  });
+}
+
+class _DeniedAdapter extends PrinterAdapter {
+  @override
+  Future<bool> get permissionGranted async => false;
 }

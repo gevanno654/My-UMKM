@@ -34,6 +34,10 @@ void main() {
     expect(receiptItemLine(2, 3500, 7000).length, 32);
   });
 
+  test('pair kanan ekstrem tidak crash, tetap 32 kolom', () {
+    expect(receiptPair('TOTAL', 'X' * 40).length, 32);
+  });
+
   test('struk memuat nama warung, nomor, total, bayar, kembali', () async {
     final sale = sampleSale();
     final bytes = await buildReceiptBytes(sale: sale, storeName: 'Warung Barokah');

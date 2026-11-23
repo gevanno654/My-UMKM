@@ -15,10 +15,11 @@ String receiptCenter(String s) {
 
 /// Pasangan kiri-kanan dalam 32 kolom (murni, unit-testable).
 String receiptPair(String left, String right) {
-  var l = left;
-  final maxLeft = receiptColumns - right.length - 1;
-  if (l.length > maxLeft) l = '${l.substring(0, maxLeft - 1)}.';
-  return '$l${' ' * (receiptColumns - l.length - right.length)}$right';
+  final r = right.length > receiptColumns ? right.substring(right.length - receiptColumns) : right;
+  final maxLeft = receiptColumns - r.length;
+  if (maxLeft <= 1) return r.substring(0, receiptColumns);
+  var l = left.length >= maxLeft ? '${left.substring(0, maxLeft - 2)}.' : left;
+  return '$l${' ' * (receiptColumns - l.length - r.length)}$r';
 }
 
 /// Nama item: potong 32 kolom (murni, unit-testable).

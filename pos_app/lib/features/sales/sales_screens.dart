@@ -404,20 +404,30 @@ class _PayScreenState extends ConsumerState<PayScreen> {
 
 /// Struk layar: nomor, tanggal, item×qty, total, bayar, kembali, metode.
 /// [ReceiptView] terstruktur terpisah agar printer Bluetooth tinggal plug-in.
-class ReceiptScreen extends ConsumerWidget {
+class ReceiptScreen extends ConsumerStatefulWidget {
   const ReceiptScreen({super.key, this.printerService});
 
   /// Diinjeksi di test agar tidak menyentuh Bluetooth asli.
   final PrinterService? printerService;
 
+  @override
+  ConsumerState<ReceiptScreen> createState() => _ReceiptScreenState();
+}
+
+class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
+  bool _printing = false;
+
   /// Cetak opt-in: bangun byte dari transaksi tampil → pilih printer → cetak.
   /// Gagal = snackbar saja; kasir tidak diblokir.
-  Future<void> _print(BuildContext context, WidgetRef ref, SaleModel sale) async {
+  /// Tombol dikunci selama mencetak agar cetakan tidak interleave.
+  Future<void> _print(BuildContext context, SaleModel sale) async {
+    if (_printing) return;
+    setState(() => _printing = true);
     final messenger = ScaffoldMessenger.of(context);
     try {
       final (_, storeName) = await resolveStore(ref);
       final bytes = await buildReceiptBytes(sale: sale, storeName: storeName);
-      final svc = printerService ?? PrinterService();
+      final svc = widget.printerService ?? PrinterService();
       final saved = await svc.savedMac();
       String? mac = saved;
       if (!context.mounted) return;
@@ -440,11 +450,13 @@ class ReceiptScreen extends ConsumerWidget {
       messenger.showSnackBar(
         const SnackBar(content: Text('Gagal mencetak. Coba lagi.')),
       );
+    } finally {
+      if (mounted) setState(() => _printing = false);
     }
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final state = ref.watch(salesProvider);
     final sale = state.history.isEmpty ? null : state.history.first;
     return Scaffold(
@@ -459,9 +471,15 @@ class ReceiptScreen extends ConsumerWidget {
                   Expanded(child: ReceiptView(sale: sale)),
                   const SizedBox(height: 8),
                   OutlinedButton.icon(
-                    onPressed: () => _print(context, ref, sale),
-                    icon: const Icon(Icons.print_outlined),
-                    label: const Text('Cetak Struk'),
+                    onPressed: _printing ? null : () => _print(context, sale),
+                    icon: _printing
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.print_outlined),
+                    label: Text(_printing ? 'Mencetak…' : 'Cetak Struk'),
                   ),
                   const SizedBox(height: 8),
                   FilledButton(

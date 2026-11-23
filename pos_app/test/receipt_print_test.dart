@@ -112,6 +112,9 @@ class _FakeFailingStorage implements SecureStorage {
 /// Adapter yang selalu gagal connect → alur error terkendali tanpa Bluetooth.
 class _FakeFailingAdapter extends PrinterAdapter {
   @override
+  Future<bool> get permissionGranted async => true;
+
+  @override
   Future<bool> get bluetoothEnabled async => true;
 
   @override
