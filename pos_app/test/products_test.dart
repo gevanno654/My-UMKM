@@ -399,6 +399,44 @@ void main() {
       expect(row.photoSize, 77);
     });
 
+    test('push kirim photoHash/photoSize; pull pertahankan path lokal', () async {
+
+      String? putPhotoHash;
+      final env = makeNotifier((options) {
+        if (options.method == 'PUT') {
+          putPhotoHash =
+              (options.data as Map<String, dynamic>)['photoHash'] as String?;
+          return ok(options, serverRow(id: 'p-1', updatedAtMillis: 1000));
+        }
+        return ok(options, [
+          serverRow(
+            id: 'p-1',
+            updatedAtMillis: 2000,
+            photoHash: 'a' * 64,
+            photoSize: 123,
+          ),
+        ]);
+      });
+      await env.notifier.load('store-1');
+      await env.notifier.saveProduct(
+        product(
+          id: 'p-1',
+          photoPath: 'product_photos/lokal.jpg',
+          photoHash: 'c' * 64,
+          photoSize: 9,
+          updatedAt: 1000,
+        ),
+      );
+
+      await env.notifier.syncNow(accessToken: 'access-1');
+
+      expect(putPhotoHash, 'c' * 64);
+      final row = (await env.db.getProduct('p-1'))!;
+      expect(row.photoPath, 'product_photos/lokal.jpg');
+      expect(row.photoHash, 'a' * 64);
+      expect(row.photoSize, 123);
+    });
+
     test('sync: server lebih baru menang (LWW)', () async {
       final env = makeNotifier((options) {
         if (options.method == 'PUT') {
@@ -587,6 +625,90 @@ void main() {
       final row = (await db.getProduct('p-hash'))!;
       expect(row.photoHash, h1);
       expect(row.toModel().photoHash, h1);
+    });
+  });
+
+  group('PhotoApi', () {
+    Response<dynamic> okReq(RequestOptions o, Object? data,
+            [int statusCode = 200]) =>
+        Response(requestOptions: o, statusCode: statusCode, data: data);
+
+    Never failReq(RequestOptions o, int statusCode, Object? data) {
+      throw DioException(
+        requestOptions: o,
+        response: Response(
+            requestOptions: o, statusCode: statusCode, data: data),
+        type: DioExceptionType.badResponse,
+      );
+    }
+
+    Dio photoDio(FutureOr<Response<dynamic>> Function(RequestOptions) respond) {
+      final dio = Dio(BaseOptions(baseUrl: 'http://10.0.2.2:3000'));
+      dio.interceptors.add(
+        InterceptorsWrapper(
+          onRequest: (options, handler) async {
+            try {
+              handler.resolve(await respond(options));
+            } on DioException catch (e) {
+              handler.reject(e);
+            }
+          },
+        ),
+      );
+      return dio;
+    }
+
+    test('upload kirim multipart field photo; 413 ramah', () async {
+      String? uploadField;
+      final api = ProductsApi(
+        dio: photoDio((o) async {
+          if (o.path.endsWith('/photo') && o.method == 'POST') {
+            final form = o.data as FormData;
+            uploadField = form.files.firstOrNull?.key;
+            return okReq(o, {'photoHash': 'h' * 64, 'photoSize': 4});
+          }
+          return failReq(o, 413, {'error': 'photo too large'});
+        }),
+      );
+      final tmp = await Directory.systemTemp.createTemp('photo_api_test');
+      final src = File('${tmp.path}/a.jpg');
+      await src.writeAsBytes(const [0xff, 0xd8, 0xff, 0xd9]);
+
+      final r = await api.uploadPhoto(
+          accessToken: 't', productId: 'p1', file: src);
+      expect(uploadField, 'photo');
+      expect(r.photoHash, hasLength(64));
+
+      var msg = '';
+      try {
+        await ProductsApi(dio: photoDio((o) async => failReq(o, 413, {})))
+            .uploadPhoto(accessToken: 't', productId: 'p1', file: src);
+      } on DioException catch (e) {
+        msg = ProductsApi.friendlyError(e);
+      }
+      expect(msg, contains('2MB'));
+    });
+
+    test('manifest + download bytes', () async {
+      final api = ProductsApi(
+        dio: photoDio((o) async {
+          if (o.path.endsWith('/photo-manifest')) {
+            return okReq(o, [
+              {'id': 'p1', 'photoHash': 'h' * 64},
+              {'id': 'p2', 'photoHash': ''},
+            ]);
+          }
+          if (o.path.contains('/photos/')) {
+            return okReq(o, [0xff, 0xd8, 0xff, 0xd9]);
+          }
+          return failReq(o, 404, {});
+        }),
+      );
+      final man = await api.photoManifest('t');
+      expect(man, {'p1': 'h' * 64, 'p2': ''});
+      final bytes =
+          await api.downloadPhoto(accessToken: 't', hash: 'h' * 64);
+      expect(bytes, const [0xff, 0xd8, 0xff, 0xd9]);
     });
   });
 

@@ -1,4 +1,7 @@
+import 'dart:io';
+
 import 'package:dio/dio.dart';
+import 'package:path/path.dart' as p;
 
 import '../../core/db/app_db.dart';
 import 'product_model.dart';
@@ -38,6 +41,8 @@ class ProductsApi {
       case 409:
         if (code == 'barcode taken') return 'Barcode sudah dipakai';
         return 'Data bentrok dengan server.';
+      case 413:
+        return 'Foto terlalu besar (maks 2MB).';
       default:
         if (e.type == DioExceptionType.connectionTimeout ||
             e.type == DioExceptionType.receiveTimeout ||
@@ -85,6 +90,56 @@ class ProductsApi {
       '/api/v1/products/$id',
       options: _auth(accessToken),
     );
+  }
+
+  /// Upload foto produk (multipart field `photo`, ≤2MB di server).
+  /// Mengembalikan hash + ukuran versi server (otoritatif setelah upload).
+  Future<({String photoHash, int photoSize})> uploadPhoto({
+    required String accessToken,
+    required String productId,
+    required File file,
+  }) async {
+    final form = FormData.fromMap({
+      'photo': await MultipartFile.fromFile(
+        file.path,
+        filename: p.basename(file.path),
+      ),
+    });
+    final res = await _dio.post<Map<String, dynamic>>(
+      '/api/v1/products/$productId/photo',
+      data: form,
+      options: _auth(accessToken),
+    );
+    final data = res.data!;
+    return (
+      photoHash: data['photoHash'] as String? ?? '',
+      photoSize: (data['photoSize'] as num?)?.toInt() ?? 0,
+    );
+  }
+
+  /// Unduh bytes foto milik store dari hash. 404 = bukan milik store.
+  Future<List<int>> downloadPhoto({
+    required String accessToken,
+    required String hash,
+  }) async {
+    final res = await _dio.get<List<int>>(
+      '/api/v1/products/photos/$hash',
+      options: _auth(accessToken).copyWith(responseType: ResponseType.bytes),
+    );
+    return res.data!;
+  }
+
+  /// Manifest ringan `{id: photoHash}` milik store untuk sinkron delta.
+  Future<Map<String, String>> photoManifest(String accessToken) async {
+    final res = await _dio.get<List<dynamic>>(
+      '/api/v1/products/photo-manifest',
+      options: _auth(accessToken),
+    );
+    return {
+      for (final e in res.data!)
+        (e as Map<String, dynamic>)['id'] as String:
+            (e['photoHash'] as String? ?? ''),
+    };
   }
 
   /// Body produk ke server: hanya field katalog + harga.
