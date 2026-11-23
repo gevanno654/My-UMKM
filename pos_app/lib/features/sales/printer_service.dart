@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:permission_handler/permission_handler.dart' as ph;
 import 'package:print_bluetooth_thermal/print_bluetooth_thermal.dart';
 
@@ -24,11 +26,15 @@ enum PrinterPermission { granted, denied, permanentlyDenied }
 /// arahkan ke layar siapkan (ada tombol Buka Pengaturan).
 class PrinterNeedsSetupException implements Exception {}
 
-/// Kunci MAC printer tersimpan (per-HP, tidak ikut sinkron).
+/// Kunci lama era dialog pilih (hanya MAC). Jangan dipakai untuk tulis baru;
+/// dibaca sekali untuk migrasi ke [printerJsonKey], lalu boleh dihapus.
 const printerMacKey = 'printer_mac';
 
-/// Kunci nama printer tersimpan (ditampilkan di layar siapkan + status).
+/// Kunci lama nama era dua-kunci. Sama: hanya untuk migrasi satu arah.
 const printerNameKey = 'printer_name';
+
+/// Satu-satunya kunci tulis printer: JSON {"name","mac"} agar atomik.
+const printerJsonKey = 'printer_json';
 
 /// Adapter tipis di atas print_bluetooth_thermal agar bisa di-fake di test.
 class PrinterAdapter {
@@ -64,22 +70,48 @@ class PrinterService {
   final SecureStorage _storage;
   final PrinterAdapter _adapter;
 
-  Future<String?> savedMac() => _storage.read(printerMacKey);
-
-  Future<void> saveMac(String mac) => _storage.write(printerMacKey, mac);
-
-  /// Simpan nama+MAC berpasangan (ganti printer = tulis ulang keduanya).
-  Future<void> savePrinter({required String name, required String mac}) async {
-    await _storage.write(printerNameKey, name);
-    await _storage.write(printerMacKey, mac);
+  @Deprecated('Pakai savePrinter; hanya-MAC tidak punya nama tampilan.')
+  Future<String?> savedMac() async {
+    final saved = await savedPrinter();
+    return saved?.$2;
   }
 
+  @Deprecated('Pakai savePrinter agar nama+MAC atomik.')
+  Future<void> saveMac(String mac) => savePrinter(name: mac, mac: mac);
+
+  /// Simpan nama+MAC atomik dalam satu kunci JSON.
+  Future<void> savePrinter({required String name, required String mac}) =>
+      _storage.write(printerJsonKey, jsonEncode({'name': name, 'mac': mac}));
+
   /// Printer tersimpan (nama, mac); null bila belum disiapkan.
+  ///
+  /// Migrasi satu arah: data lama (MAC saja atau dua kunci era awal)
+  /// dibaca sekali lalu ditulis ulang sebagai JSON atomik.
   Future<(String, String)?> savedPrinter() async {
+    final raw = await _storage.read(printerJsonKey);
+    if (raw != null && raw.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(raw) as Map<String, dynamic>;
+        final name = decoded['name'] as String?;
+        final mac = decoded['mac'] as String?;
+        if (name != null && name.isNotEmpty && mac != null && mac.isNotEmpty) {
+          return (name, mac);
+        }
+      } on FormatException {
+        // JSON rusak → jatuh ke migrasi/paksa siapkan ulang.
+      }
+    }
     final name = await _storage.read(printerNameKey);
-    final mac = await _storage.read(printerMacKey);
-    if (name == null || name.isEmpty || mac == null || mac.isEmpty) return null;
-    return (name, mac);
+    var mac = await _storage.read(printerMacKey);
+    if ((mac == null || mac.isEmpty) && name != null && name.isNotEmpty) {
+      mac = name;
+    }
+    if (mac == null || mac.isEmpty) return null;
+    final resolved = (name != null && name.isNotEmpty) ? name : mac;
+    await savePrinter(name: resolved, mac: mac);
+    await _storage.delete(printerNameKey);
+    await _storage.delete(printerMacKey);
+    return (resolved, mac);
   }
 
   /// Daftar printer yang sudah di-pair di HP.
@@ -101,7 +133,8 @@ class PrinterService {
   ///
   /// Lempar [PrinterException] dengan pesan ramah untuk semua kegagalan.
   Future<void> printBytes(List<int> bytes, {String? mac}) async {
-    final target = mac ?? await savedMac();
+    String? target = mac;
+    target ??= (await savedPrinter())?.$2;
     if (target == null || target.isEmpty) {
       throw PrinterException('Belum ada printer tersimpan. Pilih printer dulu.');
     }

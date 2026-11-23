@@ -508,15 +508,6 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
   }
 }
 
-/// Nama + MAC printer untuk layar siapkan (terlepas dari tipe paket).
-/// Dipakai ulang bila nanti butuh daftar di tempat lain.
-class PrinterDevice {
-  const PrinterDevice(this.name, this.mac);
-
-  final String name;
-  final String mac;
-}
-
 class ReceiptView extends StatelessWidget {
   const ReceiptView({super.key, required this.sale});
 

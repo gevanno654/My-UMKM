@@ -31,9 +31,9 @@ class FakeSecureStorage implements SecureStorage {
 void main() {
   test('MAC tersimpan bisa dibaca kembali', () async {
     final svc = PrinterService(storage: FakeSecureStorage());
-    expect(await svc.savedMac(), isNull);
-    await svc.saveMac('66:02:BD:06:18:7B');
-    expect(await svc.savedMac(), '66:02:BD:06:18:7B');
+    expect(await svc.savedPrinter(), isNull);
+    await svc.savePrinter(name: 'RPP02N', mac: '66:02:BD:06:18:7B');
+    expect(await svc.savedPrinter(), ('RPP02N', '66:02:BD:06:18:7B'));
   });
 
   test('print tanpa adapter lempar PrinterException', () async {
@@ -42,10 +42,9 @@ void main() {
   });
 
   test('izin ditolak arahkan ke layar siapkan', () async {
-    final svc = PrinterService(
-      storage: FakeSecureStorage()..map[printerMacKey] = '00:11:22:33:44:55',
-      adapter: _DeniedAdapter(),
-    );
+    final storage = FakeSecureStorage();
+    final svc = PrinterService(storage: storage, adapter: _DeniedAdapter());
+    await svc.savePrinter(name: 'RPP02N', mac: '00:11:22:33:44:55');
     expect(
       () => svc.printBytes([1, 2, 3]),
       throwsA(isA<PrinterNeedsSetupException>()),

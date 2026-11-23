@@ -48,4 +48,20 @@ void main() {
     await svc.savePrinter(name: 'RPP02N', mac: 'AA:BB:CC:DD:EE:FF');
     expect(await svc.savedPrinter(), ('RPP02N', 'AA:BB:CC:DD:EE:FF'));
   });
+
+  test('simpanan atomik satu kunci + migrasi dari kunci lama', () async {
+    final storage = FakeSecureStorage();
+    final svc = PrinterService(storage: storage);
+    await svc.savePrinter(name: 'RPP02N', mac: 'AA:BB:CC:DD:EE:FF');
+    // Kunci lama tidak dipakai lagi: satu kunci JSON saja.
+    expect(storage.map.containsKey(printerNameKey), isFalse);
+    expect(storage.map.containsKey(printerMacKey), isFalse);
+    expect(await svc.savedPrinter(), ('RPP02N', 'AA:BB:CC:DD:EE:FF'));
+    // Data lama (hanya MAC era dialog pilih) termigrasi sekali baca.
+    final legacy = FakeSecureStorage()
+      ..map[printerMacKey] = '11:22:33:44:55:66';
+    final legacySvc = PrinterService(storage: legacy);
+    expect(await legacySvc.savedPrinter(), ('11:22:33:44:55:66', '11:22:33:44:55:66'));
+    expect(legacy.map.containsKey(printerJsonKey), isTrue);
+  });
 }

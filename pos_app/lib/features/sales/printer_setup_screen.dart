@@ -50,48 +50,43 @@ class _PrinterSetupScreenState extends State<PrinterSetupScreen> {
       _scanning = true;
       _error = null;
     });
-    final perm = await _svc.requestPermission();
-    if (!mounted) return;
-    setState(() => _permission = perm);
-    if (perm != PrinterPermission.granted) {
-      setState(() => _scanning = false);
-      return;
-    }
     try {
+      final perm = await _svc.requestPermission();
+      if (!mounted) return;
+      setState(() => _permission = perm);
+      if (perm != PrinterPermission.granted) return;
       final paired = await _svc.pairedPrinters();
       if (!mounted) return;
       final parts = partitionPrinters(paired);
       setState(() {
         _printers = parts.printers;
         _others = parts.others;
-        _scanning = false;
       });
     } on PrinterException catch (e) {
       if (!mounted) return;
-      setState(() {
-        _error = e.message;
-        _scanning = false;
-      });
+      setState(() => _error = e.message);
     } catch (_) {
       if (!mounted) return;
-      setState(() {
-        _error = 'Gagal memindai printer. Coba lagi.';
-        _scanning = false;
-      });
+      setState(() => _error = 'Gagal menyiapkan printer. Coba lagi.');
+    } finally {
+      if (mounted) setState(() => _scanning = false);
     }
   }
 
   Future<void> _choose(BluetoothInfo device) async {
-    await _svc.savePrinter(
-      name: device.name.isEmpty ? device.macAdress : device.name,
-      mac: device.macAdress,
-    );
+    final label = device.name.isEmpty ? device.macAdress : device.name;
+    try {
+      await _svc.savePrinter(name: label, mac: device.macAdress);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Gagal menyimpan printer.')));
+      return;
+    }
     if (!mounted) return;
     setState(() {
-      _saved = (
-        device.name.isEmpty ? device.macAdress : device.name,
-        device.macAdress,
-      );
+      _saved = (label, device.macAdress);
       _printers = const [];
       _others = const [];
       _permission = null;
@@ -115,7 +110,7 @@ class _PrinterSetupScreenState extends State<PrinterSetupScreen> {
                 _loadingSaved
                     ? 'Memuat…'
                     : _saved != null
-                    ? '${_saved!.$1} ✓'
+                    ? 'Tersimpan: ${_saved!.$1}'
                     : 'Belum disiapkan',
               ),
               subtitle: _saved != null ? Text(_saved!.$2) : null,
