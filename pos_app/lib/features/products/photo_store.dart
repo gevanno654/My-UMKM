@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -12,8 +13,7 @@ import 'package:uuid/uuid.dart';
 /// - File fisik: `<docs>/product_photos/<uuid>.jpg`
 /// - Di database hanya path relatif (`product_photos/<uuid>.jpg`) agar
 ///   tahan terhadap perubahan lokasi direktori antar perangkat/install.
-class PhotoStore {
-  PhotoStore({Directory? docsDirOverride}) : _docsDirOverride = docsDirOverride;
+class PhotoStore {  PhotoStore({Directory? docsDirOverride}) : _docsDirOverride = docsDirOverride;
 
   static const _dirName = 'product_photos';
   static const _uuid = Uuid();
@@ -69,6 +69,10 @@ class PhotoStore {
     }
   }
 }
+
+/// Provider PhotoStore default (docs dir aplikasi). Dioverride di test
+/// dengan `PhotoStore(docsDirOverride: tmp)` agar tulis file terisolasi.
+final photoStoreProvider = Provider<PhotoStore>((ref) => PhotoStore());
 
 /// Thumbnail foto produk: `Image.file` dengan fallback placeholder bila
 /// file hilang/rusak — tidak boleh crash.

@@ -129,6 +129,17 @@ class ProductsApi {
     return res.data!;
   }
 
+  /// Hapus file foto produk (dipakai purge; abaikan 404 di client).
+  Future<void> deletePhoto({
+    required String accessToken,
+    required String productId,
+  }) async {
+    await _dio.delete<void>(
+      '/api/v1/products/$productId/photo',
+      options: _auth(accessToken),
+    );
+  }
+
   /// Manifest ringan `{id: photoHash}` milik store untuk sinkron delta.
   Future<Map<String, String>> photoManifest(String accessToken) async {
     final res = await _dio.get<List<dynamic>>(

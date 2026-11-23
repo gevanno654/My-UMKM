@@ -118,6 +118,24 @@ class SyncAllNotifier extends Notifier<SyncAllState> {
       await restocks.pullRestocks(accessToken);
       await adjustments.pullAdjustments(accessToken);
 
+      // Fase foto: transfer file hanya yang hash-nya beda (dua arah).
+      // Gagal per-file → firstError, sinkron tidak gagal total;
+      // offline → skip diam-diam.
+      try {
+        await products.syncPhotos(
+          accessToken,
+          onFileError: (e) => firstError ??= e,
+        );
+      } on DioException catch (e) {
+        if (e.type == DioExceptionType.connectionTimeout ||
+            e.type == DioExceptionType.receiveTimeout ||
+            e.type == DioExceptionType.connectionError) {
+          state = state.copyWith(status: SyncStatus.offline);
+          return 'Tidak ada koneksi. Data tersimpan lokal, sinkron lagi nanti.';
+        }
+        firstError ??= ProductsApi.friendlyError(e);
+      }
+
       await products.load(storeId);
       await sales.load(storeId, storeName: storeName);
       await restocks.load(storeId);

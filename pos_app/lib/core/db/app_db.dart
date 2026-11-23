@@ -330,6 +330,25 @@ class AppDb extends _$AppDb {
         const ProductsCompanion(dirty: Value(0)),
       );
 
+  /// Update kolom foto produk (dipakai fase foto sinkron): hash/size/path
+  /// baru + `dirty = 1` agar metadata hash ikut push katalog berikutnya.
+  Future<void> setProductPhoto(
+    String id, {
+    required String photoPath,
+    required String photoHash,
+    required int photoSize,
+    required int nowMillis,
+  }) =>
+      (update(products)..where((t) => t.id.equals(id))).write(
+        ProductsCompanion(
+          photoPath: Value(photoPath),
+          photoHash: Value(photoHash),
+          photoSize: Value(photoSize),
+          updatedAt: Value(nowMillis),
+          dirty: const Value(1),
+        ),
+      );
+
   /// Baris kotor milik toko (belum ter-push ke server), `updatedAt` menanjak.
   Future<List<Product>> dirtyProducts(String storeId) =>
       (select(products)

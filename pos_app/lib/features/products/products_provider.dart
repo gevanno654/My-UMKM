@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:dio/dio.dart';
 import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -5,6 +7,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../core/db/app_db.dart';
 import '../auth/auth_provider.dart';
+import 'photo_store.dart';
 import 'product_model.dart';
 import 'products_api.dart';
 
@@ -258,6 +261,114 @@ class ProductsNotifier extends Notifier<ProductsState> {
     }
   }
 
+  /// Fase foto sinkron global: bandingkan hash lokal vs manifest server,
+  /// upload hanya yang beda + unduh hanya yang kurang. Stok tidak disentuh;
+  /// hanya kolom foto + file. Per-file gagal → [onFileError], lanjut.
+  /// Offline (timeout/koneksi) → return diam-diam, bukan error.
+  Future<void> syncPhotos(
+    String accessToken, {
+    PhotoStore? photoStore,
+    void Function(String)? onFileError,
+  }) async {
+    if (_storeId.isEmpty) return;    Map<String, String> manifest;
+    try {
+      manifest = await _api.photoManifest(accessToken);
+    } on DioException catch (e) {
+      if (_isOffline(e)) return;
+      rethrow;
+    }
+    final PhotoStore fileStore = photoStore ?? ref.read(photoStoreProvider);
+    final rows = await _db.watchActiveProducts(_storeId).first;
+    final archived = await _db.watchArchivedProducts(_storeId).first;
+    final byId = {
+      for (final m in [...rows, ...archived].map((r) => r.toModel())) m.id: m,
+    };
+
+    // Upload: file lokal ada + hash beda dari server ('' = server kosong).
+    for (final m in byId.values) {
+      if (m.deletedAt != null || m.photoPath.isEmpty) continue;
+      File file;
+      try {
+        file = await fileStore.resolve(m.photoPath);
+      } catch (_) {
+        continue;
+      }
+      if (!await file.exists()) continue;
+      final serverHash = manifest[m.id] ?? '';
+      String localHash = m.photoHash;
+      try {
+        if (localHash.isEmpty) localHash = await fileStore.sha256Of(file);
+      } catch (_) {
+        continue;
+      }
+      if (localHash == serverHash && serverHash.isNotEmpty) continue;
+      try {
+        final up = await _api.uploadPhoto(
+          accessToken: accessToken,
+          productId: m.id,
+          file: file,
+        );
+        await _db.setProductPhoto(
+          m.id,
+          photoPath: m.photoPath,
+          photoHash: up.photoHash,
+          photoSize: up.photoSize,
+          nowMillis: DateTime.now().toUtc().millisecondsSinceEpoch,
+        );
+        // Metadata hash ikut push katalog berikutnya (baris jadi dirty).
+      } on DioException catch (e) {
+        onFileError?.call('${m.name}: ${ProductsApi.friendlyError(e)}');
+      }
+    }
+
+    // Unduh: hash server non-kosong + (beda dari lokal || file lokal hilang).
+    for (final entry in manifest.entries) {
+      final serverHash = entry.value;
+      if (serverHash.isEmpty) continue;
+      final m = byId[entry.key];
+      final oldPath = m?.photoPath ?? '';
+      if (m != null && m.photoHash == serverHash && m.photoPath.isNotEmpty) {
+        try {
+          if (await (await fileStore.resolve(m.photoPath)).exists()) continue;
+        } catch (_) {
+          // resolve gagal → unduh ulang di bawah.
+        }
+      }
+      try {
+        final bytes = await _api.downloadPhoto(
+          accessToken: accessToken,
+          hash: serverHash,
+        );
+        final rel = 'product_photos/$serverHash.jpg';
+        final dest = await fileStore.resolve(rel);
+        await dest.parent.create(recursive: true);
+        await File(dest.path).writeAsBytes(bytes);
+        final size = await File(dest.path).length();
+        if (m != null) {
+          await _db.setProductPhoto(
+            m.id,
+            photoPath: rel,
+            photoHash: serverHash,
+            photoSize: size,
+            nowMillis: DateTime.now().toUtc().millisecondsSinceEpoch,
+          );
+        }
+        if (oldPath.isNotEmpty && oldPath != rel) {
+          await fileStore.deleteFile(oldPath);
+        }
+      } on DioException catch (e) {
+        onFileError?.call(
+          '${m?.name ?? entry.key}: ${ProductsApi.friendlyError(e)}',
+        );
+      }
+    }
+  }
+
+  bool _isOffline(DioException e) =>
+      e.type == DioExceptionType.connectionTimeout ||
+      e.type == DioExceptionType.receiveTimeout ||
+      e.type == DioExceptionType.connectionError;
+
   Future<void> pushCatalog(
     String accessToken,
     void Function(String) onRowError,
@@ -269,6 +380,13 @@ class ProductsNotifier extends Notifier<ProductsState> {
         if (p.deletedAt != null) {
           try {
             await _api.remove(accessToken, p.id);
+          } on DioException catch (e) {
+            if (e.response?.statusCode != 404) rethrow;
+          }
+          // Purge file cloud (best-effort): baris dihapus → foto yatim
+          // dibersihkan di server. 404 = tidak ada foto, abaikan.
+          try {
+            await _api.deletePhoto(accessToken: accessToken, productId: p.id);
           } on DioException catch (e) {
             if (e.response?.statusCode != 404) rethrow;
           }

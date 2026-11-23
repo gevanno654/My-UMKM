@@ -29,6 +29,8 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
   late final TextEditingController _category;
 
   String _photoPath = '';
+  String _photoHash = '';
+  int _photoSize = 0;
   bool _saving = false;
   String? _submitError;
 
@@ -46,6 +48,8 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
     _sell = TextEditingController(text: p == null ? '' : '${p.sellPrice}');
     _category = TextEditingController(text: p?.category ?? '');
     _photoPath = p?.photoPath ?? '';
+    _photoHash = p?.photoHash ?? '';
+    _photoSize = p?.photoSize ?? 0;
   }
 
   @override
@@ -102,9 +106,17 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
         imageQuality: 80,
       );
       if (picked == null || !mounted) return;
-      final relative = await PhotoStore().savePicked(picked);
+      final store = PhotoStore();
+      final relative = await store.savePicked(picked);
+      final file = await store.resolve(relative);
+      final hash = await store.sha256Of(file);
+      final size = await file.length();
       if (!mounted) return;
-      setState(() => _photoPath = relative);
+      setState(() {
+        _photoPath = relative;
+        _photoHash = hash;
+        _photoSize = size;
+      });
     } catch (_) {
       if (!mounted) return;
       setState(() => _submitError = 'Gagal mengambil foto. Coba lagi.');
@@ -149,6 +161,8 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
               stock: existing.stock,
               category: _category.text.trim(),
               photoPath: _photoPath,
+              photoHash: _photoHash,
+              photoSize: _photoSize,
               isArchived: existing.isArchived,
               createdAt: existing.createdAt,
               updatedAt: existing.updatedAt,
@@ -161,6 +175,8 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
               sellPrice: _parseInt(_sell.text),
               category: _category.text.trim(),
               photoPath: _photoPath,
+              photoHash: _photoHash,
+              photoSize: _photoSize,
             );
       final saveError = await notifier.saveProduct(model);
       if (!mounted) return;
@@ -271,7 +287,11 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
                   if (_photoPath.isNotEmpty)
                     TextButton.icon(
                       key: const Key('photoRemoveButton'),
-                      onPressed: () => setState(() => _photoPath = ''),
+                      onPressed: () => setState(() {
+                        _photoPath = '';
+                        _photoHash = '';
+                        _photoSize = 0;
+                      }),
                       icon: const Icon(Icons.delete_outline),
                       label: const Text('Hapus foto'),
                     ),

@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:dio/dio.dart';
 import 'package:drift/drift.dart' hide isNull, isNotNull;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,6 +9,7 @@ import 'package:pos_app/core/session/secure_session.dart';
 import 'package:pos_app/core/sync/sync_all_provider.dart';
 import 'package:pos_app/features/auth/auth_provider.dart';
 import 'package:pos_app/features/auth/auth_state.dart';
+import 'package:pos_app/features/products/photo_store.dart';
 import 'package:pos_app/features/products/products_api.dart';
 import 'package:pos_app/features/products/products_provider.dart' as products;
 import 'package:pos_app/features/restocks/restocks_api.dart';
@@ -58,6 +61,7 @@ makeSyncAll({
   apiHandler,
   int initialStock = 0,
   bool seedRestock = true,
+  PhotoStore? photoStore,
 }) async {
   final dio = Dio(BaseOptions(baseUrl: 'http://localhost:3000'));
   dio.interceptors.add(
@@ -82,6 +86,7 @@ makeSyncAll({
       sales.salesApiProvider.overrideWithValue(SalesApi(dio: dio)),
       restocks.restocksApiProvider.overrideWithValue(RestocksApi(dio: dio)),
       adj.adjustmentsApiProvider.overrideWithValue(AdjustmentsApi(dio: dio)),
+      photoStoreProvider.overrideWithValue(photoStore ?? PhotoStore()),
     ],
   );
   addTearDown(container.dispose);
@@ -357,6 +362,52 @@ void main() {
 
       expect(env.notifier.state.status, SyncStatus.offline);
       expect((await env.db.getProduct('p1'))!.stock, 5);
+    });
+
+    test('fase foto: manifest dipanggil, hash server baru → file terunduh',
+        () async {
+      var manifestCalls = 0;
+      var downloadCalls = 0;
+      final tmp = await Directory.systemTemp.createTemp('sync_all_photo');
+      addTearDown(() {
+        if (tmp.existsSync()) tmp.deleteSync(recursive: true);
+      });
+      final env = await makeSyncAll(
+        seedRestock: false,
+        photoStore: PhotoStore(docsDirOverride: tmp),
+        apiHandler: (options) async {
+          final path = options.path;
+          if (options.method == 'GET' && path.endsWith('/photo-manifest')) {
+            manifestCalls++;
+            return ok(options, [
+              {'id': 'p1', 'photoHash': 'c' * 64},
+            ]);
+          }
+          if (options.method == 'GET' && path.contains('/photos/')) {
+            downloadCalls++;
+            return ok(options, [0xff, 0xd8, 0xff, 0xd9]);
+          }
+          if (options.method == 'GET' && path.endsWith('/products')) {
+            return ok(options, [serverProduct()]);
+          }
+          return ok(options, []);
+        },
+      );
+
+      final err = await env.notifier.syncAll();
+
+      expect(err, isNull);
+      expect(manifestCalls, 1);
+      expect(downloadCalls, 1);
+      final row = (await env.db.getProduct('p1'))!;
+      expect(row.photoHash, 'c' * 64);
+      expect(
+        await File(
+          '${tmp.path}/${row.photoPath}'.replaceAll('/', Platform.pathSeparator),
+        ).exists(),
+        isTrue,
+      );
+      expect(row.stock, 0);
     });
   });
 }
