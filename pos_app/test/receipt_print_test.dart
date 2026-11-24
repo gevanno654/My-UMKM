@@ -165,6 +165,7 @@ void main() {
       expect(find.text('TE231120260001'), findsOneWidget);
       expect(find.text('Cetak Struk'), findsOneWidget);
       expect(find.text('Transaksi Baru'), findsOneWidget);
+      expect(find.byKey(const Key('receiptBackButton')), findsOneWidget);
     });
 
     testWidgets('ketuk Cetak tanpa printer tersimpan buka dialog pilih', (

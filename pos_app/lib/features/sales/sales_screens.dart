@@ -135,6 +135,12 @@ class _KasirScreenState extends ConsumerState<KasirScreen> {
         title: const Text('Kasir'),
         actions: [
           IconButton(
+            key: const Key('homeButton'),
+            tooltip: 'Beranda',
+            icon: const Icon(Icons.home_outlined),
+            onPressed: () => context.go('/home'),
+          ),
+          IconButton(
             key: const Key('historyButton'),
             tooltip: 'Riwayat',
             icon: const Icon(Icons.receipt_long_outlined),
@@ -460,7 +466,15 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
     final state = ref.watch(salesProvider);
     final sale = state.history.isEmpty ? null : state.history.first;
     return Scaffold(
-      appBar: AppBar(title: const Text('Struk')),
+      appBar: AppBar(
+        title: const Text('Struk'),
+        leading: IconButton(
+          key: const Key('receiptBackButton'),
+          tooltip: 'Kembali',
+          icon: const Icon(Icons.arrow_back_outlined),
+          onPressed: () => context.go('/home'),
+        ),
+      ),
       body: sale == null
           ? const Center(child: Text('Belum ada transaksi'))
           : Padding(
