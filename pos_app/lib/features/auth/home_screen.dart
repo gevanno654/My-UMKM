@@ -98,13 +98,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             const SizedBox(height: 12),
             FilledButton(
               key: const Key('kasirButton'),
-              onPressed: () => context.push('/sales'),
+              onPressed: () => context.go('/sales'),
               child: const Text('Buka Kasir'),
             ),
             const SizedBox(height: 8),
             OutlinedButton(
               key: const Key('reportsButton'),
-              onPressed: () => context.push('/reports'),
+              onPressed: () => context.go('/reports'),
               child: const Text('Lihat Laporan'),
             ),
             const SizedBox(height: 12),
@@ -118,6 +118,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   SyncStatus.idle => 'Sinkron Semua',
                 };
                 return Column(
+                  key: const Key('syncAllStatus'),
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     OutlinedButton(
@@ -129,7 +130,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     ),
                     if (sync.lastError != null)
                       Padding(
-                        key: const Key('syncAllStatus'),
                         padding: const EdgeInsets.only(top: 8),
                         child: Text(
                           sync.lastError!,

@@ -5,9 +5,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pos_app/core/db/app_db.dart';
+import 'package:pos_app/core/nav/app_shell.dart';
+import 'package:pos_app/core/router.dart';
 import 'package:pos_app/core/session/secure_session.dart';
 import 'package:pos_app/features/auth/auth_api.dart';
-import 'package:pos_app/core/nav/app_shell.dart';
 import 'package:pos_app/features/auth/auth_provider.dart';
 import 'package:pos_app/features/auth/auth_state.dart';
 import 'package:pos_app/features/auth/home_screen.dart';
@@ -291,7 +292,19 @@ void main() {
         );
       });
       expect(env.notifier.state, isA<AuthAuthenticated>());
-      await pumpHomeShell(tester, env.container);
+      // Alur produksi: Kasir (dalam ShellRoute) → drawer → Keluar.
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: env.container,
+          child: MaterialApp.router(
+            routerConfig: buildRouter(
+              initialLocation: '/sales',
+              authSnapshot: () => env.container.read(authProvider),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
 
       // Tombol Keluar kini di drawer navigasi.
       await tester.tap(find.byKey(const Key('navDrawerButton')));

@@ -31,7 +31,7 @@ class ProfitBarChart extends StatelessWidget {
           daily: daily,
           maxValue: maxValue,
           revenue: scheme.primary,
-          profit: scheme.outline,
+          profit: scheme.secondary,
           grid: scheme.outlineVariant,
         ),
       ),
@@ -57,7 +57,7 @@ class ProfitBarChart extends StatelessWidget {
       children: [
         _swatch(scheme.primary, 'Omzet'),
         const SizedBox(width: 12),
-        _swatch(scheme.outline, 'Laba'),
+        _swatch(scheme.secondary, 'Laba'),
       ],
     );
     final body = Column(

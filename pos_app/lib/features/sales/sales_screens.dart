@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/db/app_db.dart';
+import '../../core/nav/app_shell.dart';
 import '../auth/auth_provider.dart';
 import '../auth/auth_state.dart';
 import 'printer_service.dart';
@@ -132,6 +133,7 @@ class _KasirScreenState extends ConsumerState<KasirScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Kasir'),
+        leading: const DrawerMenuButton(),
         actions: [
           IconButton(
             key: const Key('homeButton'),
@@ -149,14 +151,20 @@ class _KasirScreenState extends ConsumerState<KasirScreen> {
       ),
       body: LayoutBuilder(
         builder: (context, constraints) {
+          final tablet = constraints.maxWidth >= 840;
           final search = _SearchSection(
             onSearchChanged: _onSearchChanged,
             onScan: _openScan,
             results: _results,
             search: _search,
+            // Di HP kolom tak punya batas tinggi: hasil pakai tinggi tetap.
+            // Di tablet kolom terikat tinggi layar: hasil scroll mandiri.
+            expandedResults: tablet,
           );
           const cart = _CartSection();
-          if (constraints.maxWidth >= 840) {
+          if (tablet) {
+            // Master-detail tablet: kedua kolom scroll mandiri dan
+            // terikat tinggi layar agar tidak overflow vertikal.
             return Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -185,12 +193,17 @@ class _SearchSection extends ConsumerWidget {
     required this.onScan,
     required this.results,
     required this.search,
+    required this.expandedResults,
   });
 
   final void Function(String) onSearchChanged;
   final Future<void> Function() onScan;
   final List<Product> results;
   final TextEditingController search;
+
+  /// true = hasil mengisi sisa tinggi kolom (kolom terikat, tablet);
+  /// false = tinggi tetap 200 (kolom tak terikat, HP).
+  final bool expandedResults;
 
   Future<void> _add(BuildContext context, WidgetRef ref, String id) async {
     final err = await ref.read(salesProvider.notifier).addItem(id, 1);
@@ -202,9 +215,7 @@ class _SearchSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return ListView(
-      shrinkWrap: true,
-      physics: const ClampingScrollPhysics(),
+    return Column(
       children: [
         Padding(
           padding: const EdgeInsets.all(8),
@@ -225,26 +236,47 @@ class _SearchSection extends ConsumerWidget {
           ),
         ),
         if (results.isNotEmpty)
-          SizedBox(
-            height: 200,
-            child: ListView.builder(
-              itemCount: results.length,
-              itemBuilder: (context, i) {
-                final p = results[i];
-                return ListTile(
-                  title: Text(p.name),
-                  subtitle: Text(
-                    '${formatRupiah(p.sellPrice)} • stok ${p.stock}',
+          expandedResults
+              ? Flexible(
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: results.length,
+                    itemBuilder: (context, i) {
+                      final p = results[i];
+                      return ListTile(
+                        title: Text(p.name),
+                        subtitle: Text(
+                          '${formatRupiah(p.sellPrice)} • stok ${p.stock}',
+                        ),
+                        trailing: TextButton(
+                          child: const Text('Tambah'),
+                          onPressed: () => _add(context, ref, p.id),
+                        ),
+                        onTap: () => _add(context, ref, p.id),
+                      );
+                    },
                   ),
-                  trailing: TextButton(
-                    child: const Text('Tambah'),
-                    onPressed: () => _add(context, ref, p.id),
+                )
+              : SizedBox(
+                  height: 200,
+                  child: ListView.builder(
+                    itemCount: results.length,
+                    itemBuilder: (context, i) {
+                      final p = results[i];
+                      return ListTile(
+                        title: Text(p.name),
+                        subtitle: Text(
+                          '${formatRupiah(p.sellPrice)} • stok ${p.stock}',
+                        ),
+                        trailing: TextButton(
+                          child: const Text('Tambah'),
+                          onPressed: () => _add(context, ref, p.id),
+                        ),
+                        onTap: () => _add(context, ref, p.id),
+                      );
+                    },
                   ),
-                  onTap: () => _add(context, ref, p.id),
-                );
-              },
-            ),
-          ),
+                ),
       ],
     );
   }

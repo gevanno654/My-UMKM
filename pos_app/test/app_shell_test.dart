@@ -4,6 +4,22 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pos_app/core/nav/app_shell.dart';
 
+/// Layar dummy: meniru layar fitur (AppBar sendiri + tombol drawer).
+class _DummyScreen extends StatelessWidget {
+  const _DummyScreen();
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Isi'),
+        leading: const DrawerMenuButton(),
+      ),
+      body: const Text('isi'),
+    );
+  }
+}
+
 Future<void> pumpShell(WidgetTester tester, double width, String location) async {
   final router = GoRouter(
     initialLocation: location,
@@ -13,7 +29,7 @@ Future<void> pumpShell(WidgetTester tester, double width, String location) async
         routes: [
           GoRoute(
             path: '/isi',
-            builder: (_, state) => const Text('isi'),
+            builder: (_, state) => const _DummyScreen(),
           ),
         ],
       ),
@@ -32,7 +48,9 @@ Future<void> pumpShell(WidgetTester tester, double width, String location) async
 }
 
 void main() {
-  testWidgets('layar sempit: drawer tampil, rail tidak', (tester) async {
+  testWidgets('layar sempit: tombol drawer di AppBar layar, rail tidak', (
+    tester,
+  ) async {
     await pumpShell(tester, 400, '/isi');
     expect(find.byKey(const Key('navDrawerButton')), findsOneWidget);
     expect(find.byKey(const Key('navRail')), findsNothing);

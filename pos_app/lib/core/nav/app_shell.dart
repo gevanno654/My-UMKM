@@ -7,7 +7,12 @@ import '../../features/auth/auth_provider.dart';
 
 /// Cangkang navigasi adaptif: drawer di HP (<840dp), rail permanen di tablet.
 /// Menu: Kasir, Kelola Produk, Restock, Opname, Laporan + toggle tema + Keluar.
-class AppShell extends ConsumerWidget {
+///
+/// Di HP shell TIDAK membuat AppBar sendiri (agar tidak bertumpuk dengan
+/// AppBar layar fitur). Layar utama membuka drawer lewat [DrawerMenuButton]
+/// yang dipasang sebagai `leading` AppBar mereka; sub-layar (push) mengandalkan
+/// tombol kembali + swipe tepi drawer.
+class AppShell extends ConsumerStatefulWidget {
   const AppShell({super.key, required this.child, this.selectedPath = ''});
 
   static const breakpoint = 840.0;
@@ -16,6 +21,50 @@ class AppShell extends ConsumerWidget {
 
   /// Path route aktif untuk highlight menu; kosong = tanpa seleksi.
   final String selectedPath;
+
+  @override
+  ConsumerState<AppShell> createState() => _AppShellState();
+}
+
+/// Akses pembuka drawer shell dari AppBar layar fitur (child Scaffold).
+class DrawerHandle extends InheritedWidget {
+  const DrawerHandle({
+    super.key,
+    required this.openDrawer,
+    required super.child,
+  });
+
+  final VoidCallback openDrawer;
+
+  static DrawerHandle? maybeOf(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<DrawerHandle>();
+
+  @override
+  bool updateShouldNotify(DrawerHandle old) => openDrawer != old.openDrawer;
+}
+
+/// Tombol hamburger untuk `leading` AppBar layar utama (mode HP).
+class DrawerMenuButton extends StatelessWidget {
+  const DrawerMenuButton({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final handle = DrawerHandle.maybeOf(context);
+    // Di tablet (rail) atau di luar shell: tidak tampil apa-apa.
+    if (handle == null ||
+        MediaQuery.sizeOf(context).width >= AppShell.breakpoint) {
+      return const SizedBox.shrink();
+    }
+    return IconButton(
+      key: const Key('navDrawerButton'),
+      icon: const Icon(Icons.menu_outlined),
+      onPressed: handle.openDrawer,
+    );
+  }
+}
+
+class _AppShellState extends ConsumerState<AppShell> {
+  final _scaffoldKey = GlobalKey<ScaffoldState>();
 
   static const _items = [
     (key: 'nav-kasir', label: 'Kasir', icon: Icons.point_of_sale_outlined, path: '/sales'),
@@ -36,9 +85,9 @@ class AppShell extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final wide = MediaQuery.sizeOf(context).width >= breakpoint;
-    final selected = _selectedIndex(selectedPath);
+  Widget build(BuildContext context) {
+    final wide = MediaQuery.sizeOf(context).width >= AppShell.breakpoint;
+    final selected = _selectedIndex(widget.selectedPath);
     final themeMode = switch (ref.watch(themeModeProvider)) {
       AsyncData(:final value) => value,
       _ => ThemeMode.system,
@@ -191,24 +240,21 @@ class AppShell extends ConsumerWidget {
               ],
             ),
             const VerticalDivider(width: 1),
-            Expanded(child: child),
+            Expanded(child: widget.child),
           ],
         ),
       );
     }
 
     return Scaffold(
-      appBar: AppBar(
-        leading: Builder(
-          builder: (context) => IconButton(
-            key: const Key('navDrawerButton'),
-            icon: const Icon(Icons.menu_outlined),
-            onPressed: () => Scaffold.of(context).openDrawer(),
-          ),
-        ),
-      ),
+      // Tanpa AppBar sendiri: judul + aksi milik layar fitur (child),
+      // agar tidak ada dua AppBar bertumpuk di HP.
+      key: _scaffoldKey,
       drawer: drawer,
-      body: child,
+      body: DrawerHandle(
+        openDrawer: () => _scaffoldKey.currentState?.openDrawer(),
+        child: widget.child,
+      ),
     );
   }
 }

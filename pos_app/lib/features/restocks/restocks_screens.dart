@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/db/app_db.dart';
+import '../../core/nav/app_shell.dart';
 import '../auth/auth_provider.dart';
 import '../auth/auth_state.dart';
 import '../sales/sales_screens.dart' show formatRupiah, resolveStore;
@@ -43,6 +44,7 @@ class _RestocksListScreenState extends ConsumerState<RestocksListScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Restock'),
+        leading: const DrawerMenuButton(),
       ),
       floatingActionButton: FloatingActionButton(
         key: const Key('kulakanButton'),

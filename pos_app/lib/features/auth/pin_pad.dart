@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 
 /// Keypad angka custom untuk PIN: grid 3x4, tanpa TextField/keyboard sistem.
 /// `onChanged` dipanggil setiap digit berubah. Indikator 6 titik + tombol
-/// hapus. Tombol konfirmasi tetap milik layar pemanggil (Key lama dijaga).
+/// hapus. Layar pemanggil otomatis submit saat panjang penuh (tanpa tombol
+/// konfirmasi): `Key('pinKey-$d')` untuk digit, `Key('pinKey-delete')` untuk
+/// hapus. `Key` indikator tahap milik layar (`pinField`, `confirmPinField`).
 class PinPad extends StatefulWidget {
   const PinPad({super.key, required this.onChanged, this.length = 6});
 

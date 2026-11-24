@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../sales/sales_screens.dart' show formatRupiah, resolveStore;
+import '../../core/nav/app_shell.dart';
 import 'profit_bar_chart.dart';
 import 'reports_provider.dart';
 
@@ -54,7 +55,10 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
     final state = ref.watch(reportsProvider);
     final notifier = ref.read(reportsProvider.notifier);
     return Scaffold(
-      appBar: AppBar(title: const Text('Laporan')),
+      appBar: AppBar(
+        title: const Text('Laporan'),
+        leading: const DrawerMenuButton(),
+      ),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 720),

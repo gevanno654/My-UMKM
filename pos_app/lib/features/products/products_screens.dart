@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import '../auth/auth_provider.dart';
 import '../auth/auth_state.dart';
+import '../../core/nav/app_shell.dart';
 import '../adjustments/adjustments_provider.dart' as adj;
 import 'photo_store.dart';
 import 'product_model.dart';
@@ -116,6 +117,7 @@ class _ProductsListScreenState extends ConsumerState<ProductsListScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Produk'),
+        leading: const DrawerMenuButton(),
       ),
       floatingActionButton: FloatingActionButton(
         key: const Key('addButton'),
