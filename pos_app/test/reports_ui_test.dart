@@ -142,6 +142,10 @@ void main() {
       expect(find.byKey(const Key('revenueValue')), findsOneWidget);
       expect(find.byKey(const Key('profitValue')), findsOneWidget);
       expect(find.textContaining('7.000'), findsWidgets);
+      // Chart berada di bawah viewport: ListView membangunnya lazy.
+      // Geser dulu agar item ter-build, bukan drag pada finder tak-ketemunya.
+      await tester.drag(find.byType(ListView).first, const Offset(0, -500));
+      await tester.pump();
       expect(find.byKey(const Key('profitChart')), findsOneWidget);
     });
 

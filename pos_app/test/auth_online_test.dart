@@ -7,9 +7,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:pos_app/core/db/app_db.dart';
 import 'package:pos_app/core/session/secure_session.dart';
 import 'package:pos_app/features/auth/auth_api.dart';
+import 'package:pos_app/core/nav/app_shell.dart';
 import 'package:pos_app/features/auth/auth_provider.dart';
 import 'package:pos_app/features/auth/auth_state.dart';
-import 'package:pos_app/features/auth/home_placeholder.dart';
+import 'package:pos_app/features/auth/home_screen.dart';
 import 'package:pos_app/features/auth/login_screen.dart';
 import 'package:pos_app/features/auth/register_screen.dart';
 
@@ -109,6 +110,20 @@ Future<void> pumpAuthScreen(
     UncontrolledProviderScope(
       container: container,
       child: MaterialApp(home: screen),
+    ),
+  );
+  await tester.pumpAndSettle();
+}
+
+/// Pompa [HomeScreen] di dalam [AppShell] (cangkang produksi).
+Future<void> pumpHomeShell(
+  WidgetTester tester,
+  ProviderContainer container,
+) async {
+  await tester.pumpWidget(
+    UncontrolledProviderScope(
+      container: container,
+      child: const MaterialApp(home: AppShell(child: HomeScreen())),
     ),
   );
   await tester.pumpAndSettle();
@@ -276,8 +291,11 @@ void main() {
         );
       });
       expect(env.notifier.state, isA<AuthAuthenticated>());
-      await pumpAuthScreen(tester, const HomePlaceholder(), env.container);
+      await pumpHomeShell(tester, env.container);
 
+      // Tombol Keluar kini di drawer navigasi.
+      await tester.tap(find.byKey(const Key('navDrawerButton')));
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('logoutButton')));
       await tester.pumpAndSettle();
       // Dialog konfirmasi 2 langkah.

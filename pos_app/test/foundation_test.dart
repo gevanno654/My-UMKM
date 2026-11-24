@@ -205,7 +205,7 @@ void main() {
       });
     }
 
-    testWidgets('route /home membangun HomePlaceholder', (tester) async {
+    testWidgets('route /home membangun HomeScreen', (tester) async {
       await tester.pumpWidget(
         ProviderScope(
           child: MaterialApp.router(

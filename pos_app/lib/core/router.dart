@@ -1,8 +1,9 @@
 import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
 
+import '../core/nav/app_shell.dart';
 import '../features/auth/auth_state.dart';
-import '../features/auth/home_placeholder.dart';
+import '../features/auth/home_screen.dart';
 import '../features/auth/login_screen.dart';
 import '../features/auth/pin_setup_screen.dart';
 import '../features/auth/pin_unlock_screen.dart';
@@ -112,69 +113,75 @@ GoRouter buildRouter({
       ),
       GoRoute(
         path: '/home',
-        builder: (context, state) => const HomePlaceholder(),
+        builder: (context, state) => const HomeScreen(),
       ),
-      GoRoute(
-        path: '/products',
-        builder: (context, state) => const ProductsListScreen(),
-      ),
-      GoRoute(
-        path: '/products/new',
-        builder: (context, state) => const ProductFormScreen(),
-      ),
-      GoRoute(
-        path: '/products/scan',
-        builder: (context, state) => const ScanScreen(),
-      ),
-      GoRoute(
-        path: '/products/:id',
-        builder: (context, state) => ProductDetailScreen(
-          productId: state.pathParameters['id']!,
-        ),
-      ),
-      GoRoute(
-        path: '/products/:id/edit',
-        builder: (context, state) => ProductFormScreen(
-          product: state.extra as ProductModel?,
-        ),
-      ),
-      GoRoute(
-        path: '/sales',
-        builder: (context, state) => const KasirScreen(),
-      ),
-      GoRoute(
-        path: '/sales/pay',
-        builder: (context, state) => const PayScreen(),
-      ),
-      GoRoute(
-        path: '/sales/receipt',
-        builder: (context, state) => const ReceiptScreen(),
-      ),
-      GoRoute(
-        path: '/sales/history',
-        builder: (context, state) => const HistoryScreen(),
-      ),
-      GoRoute(
-        path: '/restocks',
-        builder: (context, state) => const RestocksListScreen(),
-      ),
-      GoRoute(
-        path: '/restocks/new',
-        builder: (context, state) => const RestockDraftScreen(),
-      ),
-      GoRoute(
-        path: '/restocks/:id',
-        builder: (context, state) => RestockDetailScreen(
-          restockId: state.pathParameters['id']!,
-        ),
-      ),
-      GoRoute(
-        path: '/adjustments',
-        builder: (context, state) => const AdjustmentsListScreen(),
-      ),
-      GoRoute(
-        path: '/reports',
-        builder: (context, state) => const ReportsScreen(),
+      ShellRoute(
+        builder: (context, state, child) =>
+            AppShell(selectedPath: state.uri.path, child: child),
+        routes: [
+          GoRoute(
+            path: '/products',
+            builder: (context, state) => const ProductsListScreen(),
+          ),
+          GoRoute(
+            path: '/products/new',
+            builder: (context, state) => const ProductFormScreen(),
+          ),
+          GoRoute(
+            path: '/products/scan',
+            builder: (context, state) => const ScanScreen(),
+          ),
+          GoRoute(
+            path: '/products/:id',
+            builder: (context, state) => ProductDetailScreen(
+              productId: state.pathParameters['id']!,
+            ),
+          ),
+          GoRoute(
+            path: '/products/:id/edit',
+            builder: (context, state) => ProductFormScreen(
+              product: state.extra as ProductModel?,
+            ),
+          ),
+          GoRoute(
+            path: '/sales',
+            builder: (context, state) => const KasirScreen(),
+          ),
+          GoRoute(
+            path: '/sales/pay',
+            builder: (context, state) => const PayScreen(),
+          ),
+          GoRoute(
+            path: '/sales/receipt',
+            builder: (context, state) => const ReceiptScreen(),
+          ),
+          GoRoute(
+            path: '/sales/history',
+            builder: (context, state) => const HistoryScreen(),
+          ),
+          GoRoute(
+            path: '/restocks',
+            builder: (context, state) => const RestocksListScreen(),
+          ),
+          GoRoute(
+            path: '/restocks/new',
+            builder: (context, state) => const RestockDraftScreen(),
+          ),
+          GoRoute(
+            path: '/restocks/:id',
+            builder: (context, state) => RestockDetailScreen(
+              restockId: state.pathParameters['id']!,
+            ),
+          ),
+          GoRoute(
+            path: '/adjustments',
+            builder: (context, state) => const AdjustmentsListScreen(),
+          ),
+          GoRoute(
+            path: '/reports',
+            builder: (context, state) => const ReportsScreen(),
+          ),
+        ],
       ),
     ],
   );
