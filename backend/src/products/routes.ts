@@ -91,6 +91,22 @@ function storeIdOf(req: unknown): string {
   return (req as { auth: Authed }).auth.storeId;
 }
 
+/// Baris aktif pemegang barcode (rekonsiliasi 409): null bila tak ada.
+/// Dipakai client untuk adopsi ID server saat ID lokalnya asing.
+async function findByBarcode(storeId: string, barcode: string | null) {
+  if (barcode == null) return null;
+  const rows = await getPool().query(
+    `SELECT id, name, barcode, cost_price, sell_price, stock, category,
+            photo_path, photo_hash, photo_size, updated_at, deleted_at
+       FROM products
+      WHERE store_id = $1::uuid AND barcode = $2 AND deleted_at IS NULL
+      LIMIT 1`,
+    [storeId, barcode],
+  );
+  if (!rows.rowCount) return null;
+  return toJson(rows.rows[0]);
+}
+
 productsRouter.get("/", async (req, res) => {
   const storeId = storeIdOf(req);
   const rows = await getPool().query(
@@ -131,7 +147,10 @@ productsRouter.post("/", async (req, res) => {
       "code" in err &&
       (err as { code: string }).code === "23505"
     ) {
-      return res.status(409).json({ error: "barcode taken" });
+      return res.status(409).json({
+        error: "barcode taken",
+        conflictWith: await findByBarcode(storeId, barcode ?? null),
+      });
     }
     throw err;
   }
@@ -185,7 +204,10 @@ productsRouter.put("/:id", async (req, res) => {
       "code" in err &&
       (err as { code: string }).code === "23505"
     ) {
-      return res.status(409).json({ error: "barcode taken" });
+      return res.status(409).json({
+        error: "barcode taken",
+        conflictWith: await findByBarcode(storeId, barcode ?? null),
+      });
     }
     throw err;
   }
