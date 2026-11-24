@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 
 import 'core/db/app_db.dart';
 import 'core/router.dart';
+import '../../core/theme/app_theme.dart';
+import '../../core/theme/theme_mode_provider.dart';
 import 'features/auth/auth_provider.dart';
 import 'features/auth/auth_state.dart';
 
@@ -52,12 +54,16 @@ class PosApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final themeAsync = ref.watch(themeModeProvider);
+    final themeMode = switch (themeAsync) {
+      AsyncData(:final value) => value,
+      _ => ThemeMode.system,
+    };
     return MaterialApp.router(
       title: 'POS Warung',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.teal),
-        useMaterial3: true,
-      ),
+      theme: AppTheme.light(),
+      darkTheme: AppTheme.dark(),
+      themeMode: themeMode,
       routerConfig: ref.watch(routerProvider),
     );
   }
