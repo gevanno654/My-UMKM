@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import '../auth/auth_provider.dart';
 import '../auth/auth_state.dart';
+import '../../core/nav/app_shell.dart';
 import '../adjustments/adjustments_provider.dart' as adj;
 import 'photo_store.dart';
 import 'product_model.dart';
@@ -116,6 +117,7 @@ class _ProductsListScreenState extends ConsumerState<ProductsListScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Produk'),
+        leading: const DrawerMenuButton(),
       ),
       floatingActionButton: FloatingActionButton(
         key: const Key('addButton'),
@@ -125,8 +127,11 @@ class _ProductsListScreenState extends ConsumerState<ProductsListScreen> {
         },
         child: const Icon(Icons.add),
       ),
-      body: Column(
-        children: [
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 720),
+          child: Column(
+            children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
             child: TextField(
@@ -280,7 +285,9 @@ class _ProductsListScreenState extends ConsumerState<ProductsListScreen> {
                         },
                       ),
           ),
-        ],
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -320,9 +327,13 @@ class ProductDetailScreen extends ConsumerWidget {
             },
           ),
         ],
-      ),      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
+      ),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 720),
+          child: ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
           Center(
             child: ProductPhotoThumb(
               photoPath: product.photoPath,
@@ -426,7 +437,9 @@ class ProductDetailScreen extends ConsumerWidget {
               ),
             ],
           ),
-        ],
+            ],
+          ),
+        ),
       ),
     );
   }

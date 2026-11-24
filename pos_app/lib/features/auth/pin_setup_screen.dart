@@ -3,8 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'auth_provider.dart';
+import 'pin_pad.dart';
 
-/// Layar pembuatan PIN 6-digit (2x input: PIN + konfirmasi).
+/// Layar pembuatan PIN 6-digit (2 tahap: PIN lalu konfirmasi).
 class PinSetupScreen extends ConsumerStatefulWidget {
   const PinSetupScreen({super.key});
 
@@ -13,28 +14,23 @@ class PinSetupScreen extends ConsumerStatefulWidget {
 }
 
 class _PinSetupScreenState extends ConsumerState<PinSetupScreen> {
-  final _formKey = GlobalKey<FormState>();
-  final _pin = TextEditingController();
-  final _confirm = TextEditingController();
+  String _pin = '';
+  bool _confirming = false;
   String? _error;
 
-  @override
-  void dispose() {
-    _pin.dispose();
-    _confirm.dispose();
-    super.dispose();
-  }
-
-  Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) return;
+  Future<void> _submit(String pin, String confirmPin) async {
     final notifier = ref.read(authProvider.notifier);
     final error = await notifier.completePinSetup(
-      pin: _pin.text,
-      confirmPin: _confirm.text,
+      pin: pin,
+      confirmPin: confirmPin,
     );
     if (!mounted) return;
     if (error != null) {
-      setState(() => _error = error);
+      setState(() {
+        _error = error;
+        _confirming = false;
+        _pin = '';
+      });
       return;
     }
     // Defer navigasi ke post-frame: state berubah (watch) + go() sinkron
@@ -48,62 +44,54 @@ class _PinSetupScreenState extends ConsumerState<PinSetupScreen> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(authProvider);
+    final stepLabel = _confirming ? 'Ulangi PIN' : 'Buat PIN 6 digit';
     return Scaffold(
       appBar: AppBar(title: const Text('Buat PIN')),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const Text(
-                'Buat PIN 6 digit untuk membuka aplikasi tanpa internet.',
-              ),
-              const SizedBox(height: 16),
-              if (_error != null)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: Text(
-                    _error!,
-                    key: const Key('errorText'),
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.error,
-                    ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              _confirming
+                  ? 'Ulangi PIN 6 digit untuk konfirmasi.'
+                  : 'Buat PIN 6 digit untuk membuka aplikasi tanpa internet.',
+            ),
+            const SizedBox(height: 16),
+            if (_error != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Text(
+                  _error!,
+                  key: const Key('errorText'),
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.error,
                   ),
                 ),
-              TextFormField(
-                key: const Key('pinField'),
-                controller: _pin,
-                keyboardType: TextInputType.number,
-                obscureText: true,
-                maxLength: 6,
-                decoration: const InputDecoration(labelText: 'PIN 6 digit'),
-                validator: (v) => v != null && v.length == 6
-                    ? null
-                    : 'PIN harus 6 digit',
               ),
-              const SizedBox(height: 12),
-              TextFormField(
-                key: const Key('confirmPinField'),
-                controller: _confirm,
-                keyboardType: TextInputType.number,
-                obscureText: true,
-                maxLength: 6,
-                decoration:
-                    const InputDecoration(labelText: 'Ulangi PIN'),
-                validator: (v) => v != null && v.length == 6
-                    ? null
-                    : 'PIN harus 6 digit',
-              ),
-              const SizedBox(height: 20),
-              ElevatedButton(
-                key: const Key('pinSetupButton'),
-                onPressed: state.isLoading ? null : _submit,
-                child: const Text('Simpan PIN'),
-              ),
-            ],
-          ),
+            Text(
+              stepLabel,
+              key: Key(_confirming ? 'confirmPinField' : 'pinField'),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            PinPad(
+              key: ValueKey('pinPad-$_confirming-$_error'),
+              onChanged: (v) {
+                if (v.length != 6) return;
+                if (!_confirming) {
+                  setState(() {
+                    _pin = v;
+                    _confirming = true;
+                  });
+                } else {
+                  _submit(_pin, v);
+                }
+              },
+            ),
+            const SizedBox(height: 12),
+            if (state.isLoading) const LinearProgressIndicator(),
+          ],
         ),
       ),
     );

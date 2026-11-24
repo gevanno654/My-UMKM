@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../sales/sales_screens.dart' show formatRupiah, resolveStore;
+import '../../core/nav/app_shell.dart';
 import 'profit_bar_chart.dart';
 import 'reports_provider.dart';
 
@@ -54,10 +55,16 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
     final state = ref.watch(reportsProvider);
     final notifier = ref.read(reportsProvider.notifier);
     return Scaffold(
-      appBar: AppBar(title: const Text('Laporan')),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
+      appBar: AppBar(
+        title: const Text('Laporan'),
+        leading: const DrawerMenuButton(),
+      ),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 720),
+          child: ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
           Wrap(
             spacing: 8,
             children: [
@@ -183,7 +190,9 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                   '${formatRupiah(s.total)} • ${s.method.name} • ${s.items.length} item',
                 ),
               ),
-        ],
+            ],
+          ),
+        ),
       ),
     );
   }

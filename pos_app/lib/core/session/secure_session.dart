@@ -52,6 +52,7 @@ class SecureSession {
   static const keyProfileJson = 'profile_json';
   static const keyPinFailCount = 'pin_fail_count';
   static const keyPinLockedUntil = 'pin_locked_until';
+  static const keyThemeMode = 'theme_mode';
 
   /// Kunci PIN milik [userId]. PIN diikat ke akun agar 2 akun di HP
   /// yang sama tidak saling memakai PIN.
@@ -147,6 +148,12 @@ class SecureSession {
       );
 
   Future<void> clearPinLockedUntil() => _storage.delete(keyPinLockedUntil);
+
+  /// Mode tema manual; null = ikut sistem.
+  Future<String?> readThemeMode() => _storage.read(keyThemeMode);
+
+  Future<void> writeThemeMode(String? mode) =>
+      _storage.write(keyThemeMode, mode);
 
   static String _newSalt() {
     final random = Random.secure();

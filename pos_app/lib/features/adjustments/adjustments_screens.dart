@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/nav/app_shell.dart';
 import '../sales/sales_screens.dart' show resolveStore;
 import 'adjustments_provider.dart';
 
@@ -83,9 +84,13 @@ class _AdjustmentsListScreenState extends ConsumerState<AdjustmentsListScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Opname'),
+        leading: const DrawerMenuButton(),
       ),
-      body: Column(
-        children: [
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 720),
+          child: Column(
+            children: [
           if (state.lastError != null)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -125,9 +130,16 @@ class _AdjustmentsListScreenState extends ConsumerState<AdjustmentsListScreen> {
                                   Text(
                                     diffStr.split(' ').first,
                                     style: TextStyle(
+                                      // Hijau/merah = status selisih (±), bukan
+                                      // identitas fitur. Skema M3 tidak punya
+                                      // warna sukses, jadi pakai error/primary.
                                       color: a.diff > 0
-                                          ? Colors.green.shade700
-                                          : Colors.red.shade700,
+                                          ? Theme.of(context)
+                                              .colorScheme
+                                              .primary
+                                          : Theme.of(context)
+                                              .colorScheme
+                                              .error,
                                       fontWeight: FontWeight.bold,
                                     ),
                                   ),
@@ -146,7 +158,9 @@ class _AdjustmentsListScreenState extends ConsumerState<AdjustmentsListScreen> {
                     },
                   ),
           ),
-        ],
+            ],
+          ),
+        ),
       ),
     );
   }

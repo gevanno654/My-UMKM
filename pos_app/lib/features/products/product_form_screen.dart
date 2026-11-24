@@ -201,9 +201,12 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
       appBar: AppBar(
         title: Text(_editing ? 'Ubah Produk' : 'Tambah Produk'),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Form(
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 720),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Form(
           key: _formKey,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -382,6 +385,8 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
                     : Text(_editing ? 'Simpan perubahan' : 'Simpan'),
               ),
             ],
+          ),
+            ),
           ),
         ),
       ),

@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/db/app_db.dart';
+import '../../core/nav/app_shell.dart';
 import '../auth/auth_provider.dart';
 import '../auth/auth_state.dart';
 import 'printer_service.dart';
@@ -129,10 +130,10 @@ class _KasirScreenState extends ConsumerState<KasirScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final state = ref.watch(salesProvider);
     return Scaffold(
       appBar: AppBar(
         title: const Text('Kasir'),
+        leading: const DrawerMenuButton(),
         actions: [
           IconButton(
             key: const Key('homeButton'),
@@ -148,141 +149,220 @@ class _KasirScreenState extends ConsumerState<KasirScreen> {
           ),
         ],
       ),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(8),
-            child: TextField(
-              key: const Key('kasirSearchField'),
-              controller: _search,
-              decoration: InputDecoration(
-                hintText: 'Cari nama / barcode…',
-                prefixIcon: const Icon(Icons.search),
-                suffixIcon: IconButton(
-                  tooltip: 'Scan barcode',
-                  icon: const Icon(Icons.qr_code_scanner),
-                  onPressed: _openScan,
-                ),
-                border: const OutlineInputBorder(),
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final tablet = constraints.maxWidth >= 840;
+          final search = _SearchSection(
+            onSearchChanged: _onSearchChanged,
+            onScan: _openScan,
+            results: _results,
+            search: _search,
+            // Di HP kolom tak punya batas tinggi: hasil pakai tinggi tetap.
+            // Di tablet kolom terikat tinggi layar: hasil scroll mandiri.
+            expandedResults: tablet,
+          );
+          const cart = _CartSection();
+          if (tablet) {
+            // Master-detail tablet: kedua kolom scroll mandiri dan
+            // terikat tinggi layar agar tidak overflow vertikal.
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(flex: 3, child: search),
+                const VerticalDivider(width: 1),
+                const SizedBox(width: 360, child: cart),
+              ],
+            );
+          }
+          return Column(
+            children: [
+              search,
+              const Divider(height: 1),
+              const Expanded(child: cart),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _SearchSection extends ConsumerWidget {
+  const _SearchSection({
+    required this.onSearchChanged,
+    required this.onScan,
+    required this.results,
+    required this.search,
+    required this.expandedResults,
+  });
+
+  final void Function(String) onSearchChanged;
+  final Future<void> Function() onScan;
+  final List<Product> results;
+  final TextEditingController search;
+
+  /// true = hasil mengisi sisa tinggi kolom (kolom terikat, tablet);
+  /// false = tinggi tetap 200 (kolom tak terikat, HP).
+  final bool expandedResults;
+
+  Future<void> _add(BuildContext context, WidgetRef ref, String id) async {
+    final err = await ref.read(salesProvider.notifier).addItem(id, 1);
+    if (!context.mounted) return;
+    if (err != null) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(err)));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(8),
+          child: TextField(
+            key: const Key('kasirSearchField'),
+            controller: search,
+            decoration: InputDecoration(
+              hintText: 'Cari nama / barcode…',
+              prefixIcon: const Icon(Icons.search),
+              suffixIcon: IconButton(
+                tooltip: 'Scan barcode',
+                icon: const Icon(Icons.qr_code_scanner),
+                onPressed: onScan,
               ),
-              onChanged: _onSearchChanged,
+              border: const OutlineInputBorder(),
             ),
+            onChanged: onSearchChanged,
           ),
-          if (_results.isNotEmpty)
-            SizedBox(
-              height: 200,
-              child: ListView.builder(
-                itemCount: _results.length,
-                itemBuilder: (context, i) {
-                  final p = _results[i];
-                  return ListTile(
-                    title: Text(p.name),
-                    subtitle: Text(
-                      '${formatRupiah(p.sellPrice)} • stok ${p.stock}',
-                    ),
-                    trailing: TextButton(
-                      child: const Text('Tambah'),
-                      onPressed: () async {
-                        final err = await ref
-                            .read(salesProvider.notifier)
-                            .addItem(p.id, 1);
-                        if (!context.mounted) return;
-                        if (err != null) {
-                          ScaffoldMessenger.of(
-                            context,
-                          ).showSnackBar(SnackBar(content: Text(err)));
-                        }
-                      },
-                    ),
-                    onTap: () async {
-                      final err = await ref
-                          .read(salesProvider.notifier)
-                          .addItem(p.id, 1);
-                      if (!context.mounted) return;
-                      if (err != null) {
-                        ScaffoldMessenger.of(
-                          context,
-                        ).showSnackBar(SnackBar(content: Text(err)));
-                      }
-                    },
-                  );
-                },
-              ),
-            ),
-          const Divider(),
-          Expanded(
-            child: state.cartLines.isEmpty
-                ? const Center(child: Text('Keranjang kosong'))
-                : ListView.builder(
-                    itemCount: state.cartLines.length,
+        ),
+        if (results.isNotEmpty)
+          expandedResults
+              ? Flexible(
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: results.length,
                     itemBuilder: (context, i) {
-                      final line = state.cartLines[i];
-                      final product = state.catalog[line.productId];
-                      final name = product?.name ?? 'Produk dihapus';
-                      final price = product?.sellPrice ?? 0;
+                      final p = results[i];
                       return ListTile(
-                        title: Text(name),
-                        subtitle: Text(formatRupiah(price)),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            IconButton(
-                              icon: const Icon(Icons.remove),
-                              onPressed: () => ref
-                                  .read(salesProvider.notifier)
-                                  .setQty(line.productId, line.qty - 1),
-                            ),
-                            Text('${line.qty}'),
-                            IconButton(
-                              icon: const Icon(Icons.add),
-                              onPressed: () => ref
-                                  .read(salesProvider.notifier)
-                                  .setQty(line.productId, line.qty + 1),
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.delete_outline),
-                              onPressed: () => ref
-                                  .read(salesProvider.notifier)
-                                  .setQty(line.productId, 0),
-                            ),
-                          ],
+                        title: Text(p.name),
+                        subtitle: Text(
+                          '${formatRupiah(p.sellPrice)} • stok ${p.stock}',
                         ),
+                        trailing: TextButton(
+                          child: const Text('Tambah'),
+                          onPressed: () => _add(context, ref, p.id),
+                        ),
+                        onTap: () => _add(context, ref, p.id),
                       );
                     },
                   ),
-          ),
-          if (state.lastError != null)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: Text(
-                state.lastError!,
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.error,
-                ),
-              ),
-            ),
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    'Total: ${formatRupiah(state.total)}',
-                    style: Theme.of(context).textTheme.titleLarge,
+                )
+              : SizedBox(
+                  height: 200,
+                  child: ListView.builder(
+                    itemCount: results.length,
+                    itemBuilder: (context, i) {
+                      final p = results[i];
+                      return ListTile(
+                        title: Text(p.name),
+                        subtitle: Text(
+                          '${formatRupiah(p.sellPrice)} • stok ${p.stock}',
+                        ),
+                        trailing: TextButton(
+                          child: const Text('Tambah'),
+                          onPressed: () => _add(context, ref, p.id),
+                        ),
+                        onTap: () => _add(context, ref, p.id),
+                      );
+                    },
                   ),
                 ),
-                FilledButton(
-                  key: const Key('payButton'),
-                  onPressed: state.cartLines.isEmpty
-                      ? null
-                      : () => context.push('/sales/pay'),
-                  child: const Text('Bayar'),
+      ],
+    );
+  }
+}
+
+/// Panel keranjang + total + Bayar (dipakai di layout HP maupun tablet).
+class _CartSection extends ConsumerWidget {
+  const _CartSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(salesProvider);
+    return Column(
+      children: [
+        Expanded(
+          child: state.cartLines.isEmpty
+              ? const Center(child: Text('Keranjang kosong'))
+              : ListView.builder(
+                  itemCount: state.cartLines.length,
+                  itemBuilder: (context, i) {
+                    final line = state.cartLines[i];
+                    final product = state.catalog[line.productId];
+                    final name = product?.name ?? 'Produk dihapus';
+                    final price = product?.sellPrice ?? 0;
+                    return ListTile(
+                      title: Text(name),
+                      subtitle: Text(formatRupiah(price)),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.remove),
+                            onPressed: () => ref
+                                .read(salesProvider.notifier)
+                                .setQty(line.productId, line.qty - 1),
+                          ),
+                          Text('${line.qty}'),
+                          IconButton(
+                            icon: const Icon(Icons.add),
+                            onPressed: () => ref
+                                .read(salesProvider.notifier)
+                                .setQty(line.productId, line.qty + 1),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.delete_outline),
+                            onPressed: () => ref
+                                .read(salesProvider.notifier)
+                                .setQty(line.productId, 0),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
                 ),
-              ],
+        ),
+        if (state.lastError != null)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Text(
+              state.lastError!,
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.error,
+              ),
             ),
           ),
-        ],
-      ),
+        Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Total: ${formatRupiah(state.total)}',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+              ),
+              FilledButton(
+                key: const Key('payButton'),
+                onPressed: state.cartLines.isEmpty
+                    ? null
+                    : () => context.push('/sales/pay'),
+                child: const Text('Bayar'),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
@@ -314,11 +394,14 @@ class _PayScreenState extends ConsumerState<PayScreen> {
     final canPay = _method != PayMethod.tunai || _paidValue >= state.total;
     return Scaffold(
       appBar: AppBar(title: const Text('Bayar')),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 720),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
             Text(
               'Total: ${formatRupiah(state.total)}',
               style: Theme.of(context).textTheme.headlineSmall,
@@ -401,7 +484,9 @@ class _PayScreenState extends ConsumerState<PayScreen> {
                   : null,
               child: const Text('Konfirmasi Bayar'),
             ),
-          ],
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -477,30 +562,39 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
       ),
       body: sale == null
           ? const Center(child: Text('Belum ada transaksi'))
-          : Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Expanded(child: ReceiptView(sale: sale)),
-                  const SizedBox(height: 8),
-                  OutlinedButton.icon(
-                    onPressed: _printing ? null : () => _print(context, sale),
-                    icon: _printing
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.print_outlined),
-                    label: Text(_printing ? 'Mencetak…' : 'Cetak Struk'),
+          : Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 720),
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Expanded(child: ReceiptView(sale: sale)),
+                      const SizedBox(height: 8),
+                      OutlinedButton.icon(
+                        onPressed: _printing ? null : () => _print(context, sale),
+                        icon: _printing
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Icon(Icons.print_outlined),
+                        label: Text(
+                          _printing ? 'Mencetak…' : 'Cetak Struk',
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      FilledButton(
+                        onPressed: () => context.go('/sales'),
+                        child: const Text('Transaksi Baru'),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 8),
-                  FilledButton(
-                    onPressed: () => context.go('/sales'),
-                    child: const Text('Transaksi Baru'),
-                  ),
-                ],
+                ),
               ),
             ),
     );
@@ -711,26 +805,34 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
       ),
       body: state.history.isEmpty
           ? const Center(child: Text('Belum ada transaksi'))
-          : ListView.builder(
-              itemCount: state.history.length,
-              itemBuilder: (context, i) {
-                final s = state.history[i];
-                return ListTile(
-                  title: Text(s.number),
-                  subtitle: Text(
-                    '${formatRupiah(s.total)} • ${s.method.name}'
-                    '${s.isVoided ? ' • VOID' : ''}',
-                  ),
-                  trailing: s.isVoided
-                      ? const Text('VOID')
-                      : IconButton(
-                          key: const Key('voidButton'),
-                          tooltip: 'Void',
-                          icon: const Icon(Icons.cancel_outlined),
-                          onPressed: () => _confirmVoid(s.id, s.number),
-                        ),
-                );
-              },
+          : Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 720),
+                child: ListView.builder(
+                  itemCount: state.history.length,
+                  itemBuilder: (context, i) {
+                    final s = state.history[i];
+                    return ListTile(
+                      title: Text(s.number),
+                      subtitle: Text(
+                        '${formatRupiah(s.total)} • ${s.method.name}'
+                        '${s.isVoided ? ' • VOID' : ''}',
+                      ),
+                      trailing: s.isVoided
+                          ? const Text('VOID')
+                          : IconButton(
+                              key: const Key('voidButton'),
+                              tooltip: 'Void',
+                              icon: const Icon(
+                                Icons.cancel_outlined,
+                              ),
+                              onPressed: () =>
+                                  _confirmVoid(s.id, s.number),
+                            ),
+                    );
+                  },
+                ),
+              ),
             ),
     );
   }

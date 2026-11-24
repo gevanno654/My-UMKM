@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'auth_provider.dart';
 import 'auth_state.dart';
 import 'pin_guard.dart';
+import 'pin_pad.dart';
 
 /// Layar buka-kunci PIN (murni offline — tanpa panggilan jaringan).
 class PinUnlockScreen extends ConsumerStatefulWidget {
@@ -15,16 +16,9 @@ class PinUnlockScreen extends ConsumerStatefulWidget {
 }
 
 class _PinUnlockScreenState extends ConsumerState<PinUnlockScreen> {
-  final _pin = TextEditingController();
   String? _error;
 
-  @override
-  void dispose() {
-    _pin.dispose();
-    super.dispose();
-  }
-
-  Future<void> _submit() async {
+  Future<void> _submit(String pin) async {
     final notifier = ref.read(authProvider.notifier);
     final userId = switch (ref.read(authProvider)) {
       AuthPinLocked(profile: final p) => p.id,
@@ -46,7 +40,7 @@ class _PinUnlockScreenState extends ConsumerState<PinUnlockScreen> {
       );
       return;
     }
-    final ok = await notifier.unlockSession(_pin.text);
+    final ok = await notifier.unlockSession(pin);
     if (!mounted) return;
     if (ok) {
       // Defer seperti PinSetupScreen: hindari rebuild loop saat pumpAndSettle.
@@ -69,7 +63,7 @@ class _PinUnlockScreenState extends ConsumerState<PinUnlockScreen> {
     final state = ref.watch(authProvider);
     return Scaffold(
       appBar: AppBar(title: const Text('Buka dengan PIN')),
-      body: Padding(
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -85,20 +79,21 @@ class _PinUnlockScreenState extends ConsumerState<PinUnlockScreen> {
                   ),
                 ),
               ),
-            TextField(
-              key: const Key('pinField'),
-              controller: _pin,
-              keyboardType: TextInputType.number,
-              obscureText: true,
-              maxLength: 6,
-              decoration: const InputDecoration(labelText: 'PIN 6 digit'),
+            const Text(
+              'PIN 6 digit',
+              key: Key('pinField'),
+              textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 20),
-            ElevatedButton(
-              key: const Key('pinUnlockButton'),
-              onPressed: state.isLoading ? null : _submit,
-              child: const Text('Buka'),
+            const SizedBox(height: 8),
+            PinPad(
+              key: ValueKey('pinPad-$_error'),
+              onChanged: (v) {
+                if (v.length != 6 || state.isLoading) return;
+                _submit(v);
+              },
             ),
+            const SizedBox(height: 12),
+            if (state.isLoading) const LinearProgressIndicator(),
           ],
         ),
       ),

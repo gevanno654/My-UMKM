@@ -55,13 +55,30 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     final state = ref.watch(authProvider);
     return Scaffold(
       appBar: AppBar(title: const Text('Daftar Toko')),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
+      body: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 420),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Center(
+                    child: Image.asset(
+                      'assets/logo.png',
+                      width: 72,
+                      height: 72,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'POS Warung',
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  const SizedBox(height: 24),
               if (state.error != null)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 12),
@@ -127,7 +144,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 onPressed: () => context.go('/login'),
                 child: const Text('Sudah punya akun? Masuk'),
               ),
-            ],
+                ],
+              ),
+            ),
           ),
         ),
       ),
