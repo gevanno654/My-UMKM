@@ -173,7 +173,7 @@ void main() {
       });
     }
 
-    testWidgets('route /splash menampilkan loading', (tester) async {
+    testWidgets('route /splash menampilkan logo dan nama aplikasi', (tester) async {
       await tester.pumpWidget(
         ProviderScope(
           child: MaterialApp.router(
@@ -183,8 +183,9 @@ void main() {
       );
       await tester.pump();
 
-      // Splash langsung menampilkan indikator; redirect terjadi setelah frame.
-      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+      // Splash berlogo; redirect terjadi setelah frame.
+      expect(find.byType(Image), findsOneWidget);
+      expect(find.text('POS Warung'), findsOneWidget);
     });
 
     for (final entry in {'/login': 'Masuk', '/register': 'Daftar'}.entries) {

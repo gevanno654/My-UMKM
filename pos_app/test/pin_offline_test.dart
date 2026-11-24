@@ -113,6 +113,14 @@ Future<void> seedFullSession(SecureSession session) async {
 Future<void> runRealAsync(WidgetTester tester, Future<void> Function() fn) =>
     tester.runAsync(fn);
 
+/// Mengetik PIN via keypad custom (tanpa keyboard sistem).
+Future<void> enterPin(WidgetTester tester, String pin) async {
+  for (final d in pin.split('')) {
+    await tester.tap(find.byKey(Key('pinKey-$d')));
+  }
+  await tester.pump();
+}
+
 /// Memompa [screen] di dalam GoRouter minimal (agar `context.go` berfungsi).
 Future<void> pumpPinScreen(
   WidgetTester tester,
@@ -206,9 +214,9 @@ void main() {
       expect(env.notifier.state, isA<AuthPinSetupRequired>());
       await tester.pumpAndSettle();
 
-      await tester.enterText(find.byKey(const Key('pinField')), '123456');
-      await tester.enterText(find.byKey(const Key('confirmPinField')), '123456');
-      await tester.tap(find.byKey(const Key('pinSetupButton')));
+      await enterPin(tester, '123456');
+      await tester.pumpAndSettle();
+      await enterPin(tester, '123456');
       await tester.pumpAndSettle();
 
       expect(env.notifier.state, isA<AuthAuthenticated>());
@@ -231,9 +239,9 @@ void main() {
         ),
       );
 
-      await tester.enterText(find.byKey(const Key('pinField')), '123456');
-      await tester.enterText(find.byKey(const Key('confirmPinField')), '654321');
-      await tester.tap(find.byKey(const Key('pinSetupButton')));
+      await enterPin(tester, '123456');
+      await tester.pumpAndSettle();
+      await enterPin(tester, '654321');
       await tester.pumpAndSettle();
 
       expect(find.byKey(const Key('errorText')), findsOneWidget);
@@ -313,8 +321,7 @@ void main() {
       await runRealAsync(tester, () => env.notifier.bootstrap());
       await tester.pumpAndSettle();
 
-      await tester.enterText(find.byKey(const Key('pinField')), '000000');
-      await tester.tap(find.byKey(const Key('pinUnlockButton')));
+      await enterPin(tester, '000000');
       await tester.pumpAndSettle();
 
       expect(find.byKey(const Key('errorText')), findsOneWidget);
@@ -330,8 +337,7 @@ void main() {
       await runRealAsync(tester, () => env.notifier.bootstrap());
       await tester.pumpAndSettle();
 
-      await tester.enterText(find.byKey(const Key('pinField')), '123456');
-      await tester.tap(find.byKey(const Key('pinUnlockButton')));
+      await enterPin(tester, '123456');
       await tester.pumpAndSettle();
 
       expect(env.notifier.state, isA<AuthAuthenticated>());
