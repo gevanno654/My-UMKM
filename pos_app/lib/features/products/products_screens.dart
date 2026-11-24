@@ -125,8 +125,11 @@ class _ProductsListScreenState extends ConsumerState<ProductsListScreen> {
         },
         child: const Icon(Icons.add),
       ),
-      body: Column(
-        children: [
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 720),
+          child: Column(
+            children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
             child: TextField(
@@ -280,7 +283,9 @@ class _ProductsListScreenState extends ConsumerState<ProductsListScreen> {
                         },
                       ),
           ),
-        ],
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -320,9 +325,13 @@ class ProductDetailScreen extends ConsumerWidget {
             },
           ),
         ],
-      ),      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
+      ),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 720),
+          child: ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
           Center(
             child: ProductPhotoThumb(
               photoPath: product.photoPath,
@@ -426,7 +435,9 @@ class ProductDetailScreen extends ConsumerWidget {
               ),
             ],
           ),
-        ],
+            ],
+          ),
+        ),
       ),
     );
   }

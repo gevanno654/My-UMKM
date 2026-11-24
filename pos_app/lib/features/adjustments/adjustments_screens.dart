@@ -84,8 +84,11 @@ class _AdjustmentsListScreenState extends ConsumerState<AdjustmentsListScreen> {
       appBar: AppBar(
         title: const Text('Opname'),
       ),
-      body: Column(
-        children: [
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 720),
+          child: Column(
+            children: [
           if (state.lastError != null)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -146,7 +149,9 @@ class _AdjustmentsListScreenState extends ConsumerState<AdjustmentsListScreen> {
                     },
                   ),
           ),
-        ],
+            ],
+          ),
+        ),
       ),
     );
   }

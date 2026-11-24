@@ -55,9 +55,12 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
     final notifier = ref.read(reportsProvider.notifier);
     return Scaffold(
       appBar: AppBar(title: const Text('Laporan')),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 720),
+          child: ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
           Wrap(
             spacing: 8,
             children: [
@@ -183,7 +186,9 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                   '${formatRupiah(s.total)} • ${s.method.name} • ${s.items.length} item',
                 ),
               ),
-        ],
+            ],
+          ),
+        ),
       ),
     );
   }

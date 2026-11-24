@@ -50,8 +50,11 @@ class _RestocksListScreenState extends ConsumerState<RestocksListScreen> {
         onPressed: () => context.push('/restocks/new'),
         child: const Icon(Icons.add),
       ),
-      body: Column(
-        children: [
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 720),
+          child: Column(
+            children: [
           if (state.lastError != null)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -90,7 +93,9 @@ class _RestocksListScreenState extends ConsumerState<RestocksListScreen> {
                     },
                   ),
           ),
-        ],
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -173,8 +178,11 @@ class _RestockDraftScreenState extends ConsumerState<RestockDraftScreen> {
     final state = ref.watch(restocksProvider);
     return Scaffold(
       appBar: AppBar(title: const Text('Kulakan Baru')),
-      body: Column(
-        children: [
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 720),
+          child: Column(
+            children: [
           Padding(
             padding: const EdgeInsets.all(8),
             child: TextField(
@@ -254,7 +262,9 @@ class _RestockDraftScreenState extends ConsumerState<RestockDraftScreen> {
               ],
             ),
           ),
-        ],
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -501,9 +511,12 @@ class _RestockDetailScreenState extends ConsumerState<RestockDetailScreen> {
         DateTime.fromMillisecondsSinceEpoch(restock.createdAt).toLocal();
     return Scaffold(
       appBar: AppBar(title: const Text('Detail Restock')),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 720),
+          child: ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
           ListTile(
             title: const Text('Tanggal'),
             trailing: Text(date.toString()),
@@ -525,7 +538,12 @@ class _RestockDetailScreenState extends ConsumerState<RestockDetailScreen> {
                 '×${i.qty} • beli ${formatRupiah(i.costPrice)}'
                 '${i.sellPrice != null ? ' • jual baru ${formatRupiah(i.sellPrice!)}' : ''}',
               ),
-              trailing: Text(formatRupiah(i.subtotal)),
+              trailing: Text(
+                formatRupiah(i.subtotal),
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
+              ),
             ),
           const SizedBox(height: 16),
           if (!restock.isVoided)
@@ -535,7 +553,9 @@ class _RestockDetailScreenState extends ConsumerState<RestockDetailScreen> {
               icon: const Icon(Icons.cancel_outlined),
               label: const Text('Batalkan'),
             ),
-        ],
+            ],
+          ),
+        ),
       ),
     );
   }
