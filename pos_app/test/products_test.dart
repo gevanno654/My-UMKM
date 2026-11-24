@@ -535,6 +535,58 @@ void main() {
       expect((await env.db.getProduct('p-1'))!.dirty, 0);
     });
 
+    test('sync: 409 barcode + conflictWith → adopsi ID server lalu bersih', () async {
+      var retried = false;
+      final env = makeNotifier((options) {
+        if (options.method == 'PUT' &&
+            options.path.endsWith('p-lokal')) {
+          return fail(options, 404, {'error': 'not found'});
+        }
+        if (options.method == 'POST') {
+          return fail(options, 409, {
+            'error': 'barcode taken',
+            'conflictWith': serverRow(
+              id: 'p-server',
+              name: 'Minion',
+              barcode: '767062281296',
+              updatedAtMillis: 2000,
+            ),
+          });
+        }
+        if (options.method == 'PUT' &&
+            options.path.endsWith('p-server')) {
+          retried = true;
+          return ok(
+            options,
+            serverRow(
+              id: 'p-server',
+              name: 'Minion',
+              barcode: '767062281296',
+              updatedAtMillis: 2000,
+            ),
+          );
+        }
+        return ok(options, <Map<String, dynamic>>[]);
+      });
+      await env.notifier.load('store-1');
+      await env.notifier.saveProduct(
+        product(
+          id: 'p-lokal',
+          name: 'Minion',
+          barcode: '767062281296',
+          updatedAt: 3000,
+        ),
+      );
+
+      await env.notifier.syncNow(accessToken: 'access-1');
+
+      expect(retried, isTrue);
+      expect(env.notifier.state.syncStatus, SyncStatus.idle);
+      expect(env.notifier.state.lastError, isNull);
+      expect(await env.db.getProduct('p-lokal'), isNull);
+      expect((await env.db.getProduct('p-server'))!.dirty, 0);
+    });
+
     test('sync: 409 barcode → lastError per baris, baris lain lanjut', () async {
       final env = makeNotifier((options) {
         if (options.method == 'PUT' &&

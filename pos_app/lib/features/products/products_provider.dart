@@ -367,6 +367,46 @@ class ProductsNotifier extends Notifier<ProductsState> {
       e.type == DioExceptionType.receiveTimeout ||
       e.type == DioExceptionType.connectionError;
 
+  /// Push SATU produk dirty dengan rekonsiliasi ID otomatis.
+  ///
+  /// Dipakai pushCatalog maupun push dokumen (sale/restock/adjustment):
+  /// update → 404 → create → 409+conflictWith → adopsi ID server → retry
+  /// update sekali. Konflik tanpa info (backend lama / tanpa barcode)
+  /// dilempar sebagai DioException 409 standar agar semua pemanggil cukup
+  /// menangani DioException. Stok tidak tersentuh (PUT abaikan stok).
+  ///
+  /// Mengembalikan model ber-ID final (server bila rekonsiliasi).
+  Future<ProductModel> pushOne(String accessToken, ProductModel p) async {
+    try {
+      await _api.update(accessToken, p);
+      await _db.markClean([p.id]);
+      return p;
+    } on DioException catch (e) {
+      if (e.response?.statusCode != 404) rethrow;
+      return _reconcileOrCreate(accessToken, p);
+    } on ProductConflictException catch (e) {
+      final server = e.conflictWith;
+      if (server == null || p.barcode == null) {
+        throw DioException(
+          requestOptions: RequestOptions(path: '/api/v1/products'),
+          response: Response(
+            requestOptions: RequestOptions(path: '/api/v1/products'),
+            statusCode: 409,
+            data: const {'error': 'barcode taken'},
+          ),
+          type: DioExceptionType.badResponse,
+        );
+      }
+      await _db.adoptProductId(
+        oldId: p.id,
+        server: server.toAdoptCompanion(),
+      );
+      await _api.update(accessToken, server);
+      await _db.markClean([server.id]);
+      return server;
+    }
+  }
+
   Future<void> pushCatalog(
     String accessToken,
     void Function(String) onRowError,
@@ -388,18 +428,10 @@ class ProductsNotifier extends Notifier<ProductsState> {
           } on DioException catch (e) {
             if (e.response?.statusCode != 404) rethrow;
           }
+          await _db.markClean([p.id]);
         } else {
-          try {
-            await _api.update(accessToken, p);
-          } on DioException catch (e) {
-            if (e.response?.statusCode == 404) {
-              await _api.create(accessToken, p);
-            } else {
-              rethrow;
-            }
-          }
+          await pushOne(accessToken, p);
         }
-        await _db.markClean([p.id]);
       } on DioException catch (e) {
         if (e.response?.statusCode == 409) {
           onRowError(ProductsApi.friendlyError(e));
@@ -407,6 +439,40 @@ class ProductsNotifier extends Notifier<ProductsState> {
         }
         rethrow;
       }
+    }
+  }
+
+  /// POST fallback saat PUT 404 (ID lokal asing). 409 + conflictWith →
+  /// adopsi ID server + retry update sekali, kembalikan model ber-ID
+  /// server; selain itu perilaku lama (create lalu model asal).
+  Future<ProductModel> _reconcileOrCreate(
+    String accessToken,
+    ProductModel p,
+  ) async {
+    try {
+      await _api.create(accessToken, p);
+      await _db.markClean([p.id]);
+      return p;
+    } on ProductConflictException catch (e) {
+      final server = e.conflictWith;
+      if (server == null || p.barcode == null) {
+        throw DioException(
+          requestOptions: RequestOptions(path: '/api/v1/products'),
+          response: Response(
+            requestOptions: RequestOptions(path: '/api/v1/products'),
+            statusCode: 409,
+            data: const {'error': 'barcode taken'},
+          ),
+          type: DioExceptionType.badResponse,
+        );
+      }
+      await _db.adoptProductId(
+        oldId: p.id,
+        server: server.toAdoptCompanion(),
+      );
+      await _api.update(accessToken, server);
+      await _db.markClean([server.id]);
+      return server;
     }
   }
 

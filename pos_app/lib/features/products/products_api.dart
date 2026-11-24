@@ -10,8 +10,18 @@ import 'product_model.dart';
 ///
 /// `baseUrl` diisi dari `--dart-define API_URL`, default alamat
 /// loopback emulator Android (`http://10.0.2.2:3000`).
-class ProductsApi {
-  ProductsApi({Dio? dio, String? baseUrl})
+/// 409 `barcode taken` yang membawa identitas baris server pemegang
+/// barcode (`conflictWith`, dari backend). Client memakai info ini untuk
+/// adopsi ID server (rekonsiliasi), bukan sekadar menampilkan error.
+class ProductConflictException implements Exception {
+  const ProductConflictException({required this.conflictWith});
+
+  /// null bila server tidak menyertakan info (backend lama) atau produk
+  /// tanpa barcode (tidak ada identitas alami untuk rekonsiliasi).
+  final ProductModel? conflictWith;
+}
+
+class ProductsApi {  ProductsApi({Dio? dio, String? baseUrl})
       : _dio = dio ??
             Dio(
               BaseOptions(
@@ -68,21 +78,42 @@ class ProductsApi {
   }
 
   Future<ProductModel> create(String accessToken, ProductModel p) async {
-    final res = await _dio.post<Map<String, dynamic>>(
-      '/api/v1/products',
-      data: _toServer(p),
-      options: _auth(accessToken),
-    );
-    return _fromServer(res.data!, p.storeId);
+    try {
+      final res = await _dio.post<Map<String, dynamic>>(
+        '/api/v1/products',
+        data: _toServer(p),
+        options: _auth(accessToken),
+      );
+      return _fromServer(res.data!, p.storeId);
+    } on DioException catch (e) {
+      throw _conflictOr(e, p.storeId);
+    }
   }
 
   Future<ProductModel> update(String accessToken, ProductModel p) async {
-    final res = await _dio.put<Map<String, dynamic>>(
-      '/api/v1/products/${p.id}',
-      data: _toServer(p),
-      options: _auth(accessToken),
+    try {
+      final res = await _dio.put<Map<String, dynamic>>(
+        '/api/v1/products/${p.id}',
+        data: _toServer(p),
+        options: _auth(accessToken),
+      );
+      return _fromServer(res.data!, p.storeId);
+    } on DioException catch (e) {
+      throw _conflictOr(e, p.storeId);
+    }
+  }
+
+  /// 409 `barcode taken` → ProductConflictException (dengan conflictWith
+  /// bila ada); error lain diteruskan apa adanya.
+  Object _conflictOr(DioException e, String storeId) {
+    if (e.response?.statusCode != 409) return e;
+    final data = e.response?.data;
+    final raw = data is Map
+        ? (data['conflictWith'] as Map<String, dynamic>?)
+        : null;
+    return ProductConflictException(
+      conflictWith: raw == null ? null : _fromServer(raw, storeId),
     );
-    return _fromServer(res.data!, p.storeId);
   }
 
   Future<void> remove(String accessToken, String id) async {

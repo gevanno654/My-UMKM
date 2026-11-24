@@ -98,6 +98,24 @@ class ProductModel {
     deletedAt: row.deletedAt,
   );
 
+  /// Companion adopsi: baris `conflictWith` server untuk `adoptProductId`.
+  /// Hanya PK + kolom katalog; stock/photoPath/createdAt/dirty diabaikan
+  /// (adoptProductId mempertahankannya dari baris lokal).
+  ProductsCompanion toAdoptCompanion() => ProductsCompanion(
+    id: Value(id),
+    storeId: Value(storeId),
+    name: Value(name),
+    barcode: Value(normalizeBarcode(barcode)),
+    costPrice: Value(costPrice),
+    sellPrice: Value(sellPrice),
+    category: Value(category),
+    photoHash: Value(photoHash),
+    photoSize: Value(photoSize),
+    isArchived: Value(isArchived),
+    updatedAt: Value(updatedAt),
+    deletedAt: Value(deletedAt),
+  );
+
   /// Companion untuk insert baris baru (id sudah UUID lokal).
   /// Barcode dinormalisasi; `dirty=1` agar ikut push sinkron.
   ProductsCompanion toInsertCompanion() => ProductsCompanion.insert(

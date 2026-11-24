@@ -68,7 +68,6 @@ class SalesNotifier extends Notifier<SalesState> {
   static const _uuid = Uuid();
 
   late final SalesApi _api;
-  late final ProductsApi _productsApi;
   late final AppDb _db;
 
   String _storeId = '';
@@ -77,7 +76,6 @@ class SalesNotifier extends Notifier<SalesState> {
   @override
   SalesState build() {
     _api = ref.watch(salesApiProvider);
-    _productsApi = ref.watch(productsApiProvider);
     _db = ref.watch(appDbProvider);
     return const SalesState();
   }
@@ -332,26 +330,18 @@ class SalesNotifier extends Notifier<SalesState> {
   }
 
   /// Push produk-produk dalam sale yang masih dirty (belum ada di server),
-  /// lalu tandai bersih. Pola sama dengan ProductsNotifier._push.
+  /// lalu tandai bersih. Delegasi ke ProductsNotifier.pushOne agar
+  /// rekonsiliasi 409 konsisten dengan push katalog.
   Future<void> _pushMissingProducts(String accessToken, String saleId) async {
     final items = await _db.saleItemsOf(saleId);
+    final products = ref.read(productsProvider.notifier);
     for (final item in items) {
       final productId = item.productId;
       if (productId == null) continue;
       final product = await _db.getProduct(productId);
       if (product == null || product.deletedAt != null) continue;
-      final model = product.toModel();
       try {
-        try {
-          await _productsApi.update(accessToken, model);
-        } on DioException catch (e) {
-          if (e.response?.statusCode == 404) {
-            await _productsApi.create(accessToken, model);
-          } else {
-            rethrow;
-          }
-        }
-        await _db.markClean([productId]);
+        await products.pushOne(accessToken, product.toModel());
       } on DioException catch (e) {
         if (e.response?.statusCode == 409) continue;
         rethrow;

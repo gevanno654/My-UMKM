@@ -9,7 +9,7 @@ import '../products/products_api.dart';
 import '../products/products_provider.dart';
 import 'restocks_api.dart';
 
-export '../products/products_api.dart' show ProductRowX;final restocksApiProvider = Provider<RestocksApi>((ref) => RestocksApi());
+final restocksApiProvider = Provider<RestocksApi>((ref) => RestocksApi());
 
 final restocksProvider =
     NotifierProvider<RestocksNotifier, RestocksState>(RestocksNotifier.new);
@@ -130,7 +130,6 @@ class RestocksNotifier extends Notifier<RestocksState> {
   static const _uuid = Uuid();
 
   late final RestocksApi _api;
-  late final ProductsApi _productsApi;
   late final AppDb _db;
 
   String _storeId = '';
@@ -138,7 +137,6 @@ class RestocksNotifier extends Notifier<RestocksState> {
   @override
   RestocksState build() {
     _api = ref.watch(restocksApiProvider);
-    _productsApi = ref.watch(productsApiProvider);
     _db = ref.watch(appDbProvider);
     return const RestocksState();
   }
@@ -447,29 +445,20 @@ class RestocksNotifier extends Notifier<RestocksState> {
   /// Push produk-produk dalam restock yang dirty, lalu tandai bersih.
   /// Mengembalikan pesan error Indonesia bila ada produk gagal push
   /// (null bila semua ok / tidak ada yang perlu di-push).
-  /// Pola sama dengan SalesNotifier._pushMissingProducts.
+  /// Delegasi ke ProductsNotifier.pushOne (rekonsiliasi 409 konsisten).
   Future<String?> _pushMissingProducts(
     String accessToken,
     String restockId,
   ) async {
     final items = await _db.restockItemsOf(restockId);
+    final products = ref.read(productsProvider.notifier);
     for (final item in items) {
       final productId = item.productId;
       if (productId == null) continue;
       final product = await _db.getProduct(productId);
       if (product == null || product.deletedAt != null) continue;
-      final model = product.toModel();
       try {
-        try {
-          await _productsApi.update(accessToken, model);
-        } on DioException catch (e) {
-          if (e.response?.statusCode == 404) {
-            await _productsApi.create(accessToken, model);
-          } else {
-            rethrow;
-          }
-        }
-        await _db.markClean([productId]);
+        await products.pushOne(accessToken, product.toModel());
       } on DioException catch (e) {
         if (e.response?.statusCode == 409) {
           return ProductsApi.friendlyError(e);

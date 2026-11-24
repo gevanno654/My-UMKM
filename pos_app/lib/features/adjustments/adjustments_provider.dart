@@ -82,7 +82,6 @@ class AdjustmentsNotifier extends Notifier<AdjustmentsState> {
   static const _uuid = Uuid();
 
   late final AdjustmentsApi _api;
-  late final ProductsApi _productsApi;
   late final AppDb _db;
 
   String _storeId = '';
@@ -90,7 +89,6 @@ class AdjustmentsNotifier extends Notifier<AdjustmentsState> {
   @override
   AdjustmentsState build() {
     _api = ref.watch(adjustmentsApiProvider);
-    _productsApi = ref.watch(productsApiProvider);
     _db = ref.watch(appDbProvider);
     return const AdjustmentsState();
   }
@@ -302,7 +300,7 @@ class AdjustmentsNotifier extends Notifier<AdjustmentsState> {
   /// Push produk dalam adjustment yang dirty, lalu tandai bersih.
   /// Mengembalikan pesan error Indonesia bila ada produk gagal push
   /// (null bila semua ok / tidak ada yang perlu di-push).
-  /// Pola sama dengan RestocksNotifier._pushMissingProducts.
+  /// Delegasi ke ProductsNotifier.pushOne (rekonsiliasi 409 konsisten).
   Future<String?> _pushMissingProducts(
     String accessToken,
     String adjustmentId,
@@ -312,18 +310,10 @@ class AdjustmentsNotifier extends Notifier<AdjustmentsState> {
     if (productId == null) return null;
     final product = await _db.getProduct(productId);
     if (product == null || product.deletedAt != null) return null;
-    final model = product.toModel();
     try {
-      try {
-        await _productsApi.update(accessToken, model);
-      } on DioException catch (e) {
-        if (e.response?.statusCode == 404) {
-          await _productsApi.create(accessToken, model);
-        } else {
-          rethrow;
-        }
-      }
-      await _db.markClean([productId]);
+      await ref
+          .read(productsProvider.notifier)
+          .pushOne(accessToken, product.toModel());
     } on DioException catch (e) {
       if (e.response?.statusCode == 409) {
         return ProductsApi.friendlyError(e);
