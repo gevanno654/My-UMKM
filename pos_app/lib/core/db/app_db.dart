@@ -330,6 +330,60 @@ class AppDb extends _$AppDb {
         const ProductsCompanion(dirty: Value(0)),
       );
 
+  /// Adopsi ID server saat ID lokal asing (rekonsiliasi 409 barcode taken).
+  ///
+  /// Satu transaksi: ganti PK baris lokal + kolom katalog server, lalu
+  /// arahkan ulang semua FK lokal (sale/restock/adjustment/cart) ke ID
+  /// server. Stok + photoPath + createdAt lokal DIPERTAHANKAN (otoritas
+  /// lokal); baris tetap dirty agar retry update terkirim.
+  ///
+  /// `server` = companion baris katalog dari `conflictWith` (id server +
+  /// kolom katalog; stock/photoPath/createdAt/dirty diabaikan).
+  Future<void> adoptProductId({
+    required String oldId,
+    required ProductsCompanion server,
+  }) => transaction(() async {
+    await (update(products)..where((t) => t.id.equals(oldId))).write(
+      server.copyWith(
+        stock: const Value.absent(),
+        photoPath: const Value.absent(),
+        createdAt: const Value.absent(),
+        dirty: const Value(1),
+      ),
+    );
+    final newId = server.id.value;
+    await (update(
+      saleItems,
+    )..where((t) => t.productId.equals(oldId))).write(
+      SaleItemsCompanion(productId: Value(newId)),
+    );
+    await (update(
+      restockItems,
+    )..where((t) => t.productId.equals(oldId))).write(
+      RestockItemsCompanion(productId: Value(newId)),
+    );
+    await (update(
+      adjustments,
+    )..where((t) => t.productId.equals(oldId))).write(
+      AdjustmentsCompanion(productId: Value(newId)),
+    );
+    final cart = await (select(
+      cartLines,
+    )..where((t) => t.productId.equals(oldId))).get();
+    for (final line in cart) {
+      await into(cartLines).insertOnConflictUpdate(
+        CartLinesCompanion.insert(
+          storeId: line.storeId,
+          productId: newId,
+          qty: line.qty,
+        ),
+      );
+    }
+    await (delete(
+      cartLines,
+    )..where((t) => t.productId.equals(oldId))).go();
+  });
+
   /// Update kolom foto produk (dipakai fase foto sinkron).
   /// SENGAJA tanpa `dirty` dan tanpa bump `updatedAt`: hash otoritatif
   /// sudah tertulis di server via upload (tak perlu push ulang — PUT pun
